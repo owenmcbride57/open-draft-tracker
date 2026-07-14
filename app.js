@@ -98,7 +98,12 @@ function entryCard(row, roundsStarted, live) {
 
 // Plot every prediction on a shared scale with the live leader marked. Lower
 // (better) scores sit to the left, the way a golf leaderboard reads.
-function renderLeaderPanel({ winningScore, leaders, predictions }) {
+function renderLeaderPanel({ winningScore, leaders = [], predictions = [] }) {
+  // A visitor holding a cached index.html from before this panel existed will not
+  // have these nodes. Skip the panel rather than throwing and taking the whole
+  // board down with it — the draft order matters far more than the tracker.
+  if (!leaderScoreEl || !leaderNamesEl || !closestEl || !trackEl || !predListEl) return;
+
   const live = winningScore != null;
 
   leaderScoreEl.textContent = live ? formatToPar(winningScore) : '—';
@@ -244,6 +249,7 @@ let inFlight = false;
 // this feed with cache-control: max-age=1, so anything we show is at most as old
 // as our last poll.
 function paintFreshness() {
+  if (!refreshEl) return;
   if (DEMO) {
     refreshEl.textContent = 'DEMO — replaying a finished event, not real Open scores';
     return;
@@ -263,7 +269,7 @@ function paintFreshness() {
 async function tick() {
   if (inFlight) return;
   inFlight = true;
-  refreshBtn.disabled = true;
+  if (refreshBtn) refreshBtn.disabled = true;
   paintFreshness();
 
   try {
@@ -279,11 +285,11 @@ async function tick() {
     paintFreshness();
   } finally {
     inFlight = false;
-    refreshBtn.disabled = false;
+    if (refreshBtn) refreshBtn.disabled = false;
   }
 }
 
-refreshBtn.addEventListener('click', tick);
+refreshBtn?.addEventListener('click', tick);
 
 tick();
 setInterval(tick, REFRESH_SECONDS * 1000);
