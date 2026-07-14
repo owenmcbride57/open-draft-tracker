@@ -70,7 +70,7 @@ function roundCells(golfer, roundsStarted) {
       cls = 'round played';
     } else if (penalty) {
       text = formatToPar(penalty.score);
-      cls = 'round penalty';
+      cls = `round penalty${penalty.provisional ? ' provisional' : ''}`;
     } else if (r > roundsStarted) {
       cls = 'round pending';
     }
@@ -188,18 +188,25 @@ function renderLeaderPanel({ winningScore, leaders = [], predictions = [] }) {
     )
     .join('');
 
-  const marker = live
-    ? `<span class="leader-marker" style="left:${pos(winningScore)}%">
-         <span class="leader-marker-label">${formatToPar(winningScore)}</span>
-       </span>`
-    : '';
+  // The live leader. The scale is built from the predictions AND the leader, so
+  // this marker is always inside the track — if someone runs away to -25 the
+  // scale simply stretches to hold them and the prediction dots bunch up on the
+  // right. It can never fall off the end.
+  let marker = '';
+  if (live) {
+    const at = pos(winningScore);
+    // Keep the label inside the panel when the marker sits near an edge.
+    const edge = at < 14 ? ' edge-left' : at > 86 ? ' edge-right' : '';
+    marker = `<span class="leader-marker${edge}" style="left:${at}%">
+         <span class="leader-marker-label">LEADER ${formatToPar(winningScore)}</span>
+         <span class="leader-dot"></span>
+       </span>`;
+  }
 
   trackEl.innerHTML = `
     <span class="track-line"></span>
-    ${marker}
     ${dots}
-    <span class="track-end left">${formatToPar(lo)}</span>
-    <span class="track-end right">${formatToPar(hi)}</span>`;
+    ${marker}`;
 
   predListEl.innerHTML = predictions
     .map((p) => {
@@ -303,7 +310,7 @@ function renderGolferBoard({ cut, golferBoard, roundsStarted, winningScore, lead
 
     return `<li class="golfer-row ${standing}${crown ? ' is-leader' : ''}">
       <span class="g-name">${g.name}${crown}</span>
-      <span class="g-owners">${g.owners.join(', ')}</span>
+      <span class="g-owners"><span class="count">${g.owners.length}×</span> ${g.owners.join(', ')}</span>
       <span class="g-rounds">${rounds(g)}</span>
       ${margin}
       <span class="g-total">${formatToPar(g.total)}</span>
@@ -362,8 +369,11 @@ function render(board, standings) {
       : board.statusDetail || `Round ${roundsStarted} in progress`;
 
     const applied = Object.entries(penalties)
-      .filter(([r]) => Number(r) >= 3)
-      .map(([r, p]) => `R${r} ${formatToPar(p)}`);
+      .filter(([r, p]) => Number(r) >= 3 && p?.score != null)
+      .map(
+        ([r, p]) =>
+          `R${r} ${formatToPar(p.score)}${p.settled ? '' : ` (provisional — ${p.playing} still out)`}`,
+      );
     leaderNoteEl.textContent =
       (winningScore != null ? ` Leader at ${formatToPar(winningScore)}.` : '') +
       (applied.length ? ` Missed-cut penalty: ${applied.join(', ')}.` : '');

@@ -47,14 +47,23 @@ export async function fetchLeaderboard({ demo = false } = {}) {
   // Flatten the field into something we can reason about.
   const field = (competition.competitors || []).map((c) => {
     const rounds = {}; // round number -> score to par for that round
+    const holes = {}; // round number -> holes completed in it (18 = round done)
+
     for (const ls of c.linescores || []) {
       const par = toPar(ls.displayValue);
-      if (par != null) rounds[ls.period] = par;
+      if (par == null) continue;
+      rounds[ls.period] = par;
+      // ESPN nests the hole-by-hole card inside each round. A round with fewer
+      // than 18 holes is still in progress, and its score is only a running
+      // total — not a round score we can compare against anyone else's.
+      holes[ls.period] = (ls.linescores || []).length;
     }
+
     return {
       id: c.id,
       name: c.athlete?.displayName || 'Unknown',
       rounds,
+      holes,
       roundsPlayed: Object.keys(rounds).length,
       total: toPar(c.score),
     };
@@ -133,16 +142,41 @@ function computeCut(field, roundsStarted) {
   return { line, decided: false };
 }
 
-// The worst score anyone in the field posted in a given round. This is the
-// penalty a missed-cut golfer is charged for that round.
+const HOLES = 18;
+
+// The worst score anyone in the field has POSTED in a given round — the penalty
+// a missed-cut golfer is charged for it.
+//
+// Only completed rounds count. A player three holes into a round sitting at +1
+// has not "shot +1"; counting them would drag the worst-in-field far too soft
+// all morning and then lurch as the stragglers sign their cards. Restricting to
+// finished 18s means the number is honest at every moment: it can only ever go
+// up as more cards come in, and by the time the round is done it is final.
 function worstInRound(field, round) {
   let worst = null;
+  let posted = 0;
+  let playing = 0;
+
   for (const p of field) {
-    const r = p.rounds[round];
-    if (r == null) continue;
-    if (worst == null || r > worst) worst = r;
+    const score = p.rounds[round];
+    if (score == null) continue;
+
+    const done = (p.holes?.[round] ?? HOLES) >= HOLES;
+    if (!done) {
+      playing++;
+      continue;
+    }
+
+    posted++;
+    if (worst == null || score > worst) worst = score;
   }
-  return worst;
+
+  return {
+    score: worst,
+    posted, // how many players have finished this round
+    playing, // how many are still out there and could yet post worse
+    settled: playing === 0 && posted > 0,
+  };
 }
 
 export function computeStandings(board) {
@@ -156,7 +190,9 @@ export function computeStandings(board) {
     for (const r of Object.keys(p.rounds)) roundsStarted = Math.max(roundsStarted, Number(r));
   }
 
-  // Penalty per round, computed live from the field.
+  // Penalty per round, computed live from the field. Early in a round nobody has
+  // posted a card yet, so there is no worst score to charge — we simply don't
+  // penalise that round until the first player signs for one.
   const penalties = {};
   for (let r = 1; r <= roundsStarted; r++) penalties[r] = worstInRound(field, r);
 
@@ -188,9 +224,15 @@ export function computeStandings(board) {
       for (let r = 1; r <= roundsStarted; r++) {
         if (player.rounds[r] != null) {
           total += player.rounds[r];
-        } else if (penalties[r] != null) {
-          total += penalties[r];
-          penaltyRounds.push({ round: r, score: penalties[r] });
+        } else if (penalties[r]?.score != null) {
+          total += penalties[r].score;
+          penaltyRounds.push({
+            round: r,
+            score: penalties[r].score,
+            // Still players on the course who could post worse — this number can
+            // only rise from here.
+            provisional: !penalties[r].settled,
+          });
         }
       }
 

@@ -47,13 +47,20 @@ function check(name, fn) {
 
 const id = (key) => GOLFERS[key].id;
 
-function player(name, rounds, playerId) {
+// By default every round given is a completed 18. Pass `holesInLastRound` to
+// leave the final round in progress.
+function player(name, rounds, playerId, holesInLastRound = 18) {
   const r = {};
-  rounds.forEach((v, i) => (r[i + 1] = v));
+  const h = {};
+  rounds.forEach((v, i) => {
+    r[i + 1] = v;
+    h[i + 1] = i === rounds.length - 1 ? holesInLastRound : 18;
+  });
   return {
     id: playerId,
     name,
     rounds: r,
+    holes: h,
     roundsPlayed: rounds.length,
     total: rounds.reduce((a, b) => a + b, 0),
   };
@@ -99,7 +106,10 @@ check('a cut golfer is charged the field worst for R3 and R4', () => {
   assert.equal(s.cut, true, 'should be flagged as cut');
   assert.deepEqual(
     s.penaltyRounds,
-    [{ round: 3, score: 9 }, { round: 4, score: 11 }],
+    [
+      { round: 3, score: 9, provisional: false },
+      { round: 4, score: 11, provisional: false },
+    ],
     'should take the field worst in each missed round',
   );
   assert.equal(s.total, 30, '5 + 5 + 9 + 11');
@@ -134,6 +144,101 @@ check('no penalty for rounds that have not started yet', () => {
   const jack = rows.find((r) => r.manager === 'Jack');
   assert.equal(jack.total, 4, 'just the 36-hole totals: 8 + -4 + 0');
   assert.ok(jack.golfers.every((g) => !g.cut), 'nobody is cut before R3 exists');
+});
+
+group('live worst-score-of-the-day');
+
+check('players still out on the course do not set the worst score', () => {
+  // Rory missed the cut. Round 3 is underway: one player has POSTED +6, another
+  // is only 5 holes in at +2. The +2 must not count as a round score — he has
+  // not shot +2, he is merely +2 so far.
+  const field = [
+    player('Rory McIlroy', [5, 5], GOLFERS.mcilroy.id), // cut
+    player('Posted A', [0, 0, 6, 0], 'p1'), // finished R3 at +6
+    player('Posted B', [0, 0, 3, 0], 'p2'), // finished R3 at +3
+    player('Still Playing', [0, 0, 2], 'p3', 5), // 5 holes into R3, +2 so far
+  ];
+  const { penalties } = computeStandings(board(field));
+
+  assert.equal(penalties[3].score, 6, 'worst POSTED round is +6, not the in-progress +2');
+  assert.equal(penalties[3].posted, 2, 'two players have signed for a third round');
+  assert.equal(penalties[3].playing, 1, 'one is still out there');
+  assert.equal(penalties[3].settled, false, 'cannot be final while someone can still post worse');
+});
+
+check('the penalty settles once the last card is in', () => {
+  const field = [
+    player('Rory McIlroy', [5, 5], GOLFERS.mcilroy.id),
+    player('Posted A', [0, 0, 6, 0], 'p1'),
+    player('Posted B', [0, 0, 9, 0], 'p2'),
+  ];
+  const { penalties } = computeStandings(board(field));
+
+  assert.equal(penalties[3].score, 9);
+  assert.equal(penalties[3].playing, 0);
+  assert.equal(penalties[3].settled, true, 'nobody left on the course, so it is final');
+});
+
+check('the live penalty only ever rises as more cards come in', () => {
+  // Same round, sampled at three points in the day. The number must be
+  // monotonic — a manager should never see their penalty get *better*.
+  const cutGolfer = () => player('Rory McIlroy', [5, 5], GOLFERS.mcilroy.id);
+
+  const morning = computeStandings(
+    board([cutGolfer(), player('A', [0, 0, 2, 0], 'a'), player('B', [0, 0, 1], 'b', 4)]),
+  );
+  const afternoon = computeStandings(
+    board([cutGolfer(), player('A', [0, 0, 2, 0], 'a'), player('B', [0, 0, 5, 0], 'b')]),
+  );
+  const evening = computeStandings(
+    board([
+      cutGolfer(),
+      player('A', [0, 0, 2, 0], 'a'),
+      player('B', [0, 0, 5, 0], 'b'),
+      player('C', [0, 0, 11, 0], 'c'),
+    ]),
+  );
+
+  assert.equal(morning.penalties[3].score, 2, 'only A has posted');
+  assert.equal(afternoon.penalties[3].score, 5, 'B signs for +5');
+  assert.equal(evening.penalties[3].score, 11, 'C limps in at +11');
+  assert.ok(
+    morning.penalties[3].score <= afternoon.penalties[3].score &&
+      afternoon.penalties[3].score <= evening.penalties[3].score,
+    'the penalty must never move in the golfer’s favour',
+  );
+});
+
+check('a round nobody has finished yet charges no penalty at all', () => {
+  const field = [
+    player('Rory McIlroy', [5, 5], GOLFERS.mcilroy.id), // cut
+    player('Early Bird', [0, 0, 1], 'p1', 3), // 3 holes into R3
+  ];
+  const { penalties, rows } = computeStandings(board(field));
+
+  assert.equal(penalties[3].score, null, 'no completed round 3 exists yet');
+  assert.equal(penalties[3].posted, 0);
+
+  // Rory should carry only his real 36 holes — no invented third-round number.
+  const harry = rows.find((r) => r.manager === 'Harry');
+  const rory = harry.golfers.find((g) => g.id === GOLFERS.mcilroy.id);
+  assert.equal(rory.total, 10, 'just +5 +5; nothing added for the unfinished round');
+  assert.equal(rory.penaltyRounds.length, 0);
+});
+
+check('a provisional penalty is flagged as such', () => {
+  const field = [
+    player('Rory McIlroy', [5, 5], GOLFERS.mcilroy.id),
+    player('Posted', [0, 0, 7, 0], 'p1'),
+    player('Still Playing', [0, 0, 1], 'p2', 9),
+  ];
+  const { rows } = computeStandings(board(field));
+  const harry = rows.find((r) => r.manager === 'Harry');
+  const rory = harry.golfers.find((g) => g.id === GOLFERS.mcilroy.id);
+
+  const r3 = rory.penaltyRounds.find((p) => p.round === 3);
+  assert.equal(r3.score, 7);
+  assert.equal(r3.provisional, true, 'someone is still out, so this can still get worse');
 });
 
 group('ranking + tiebreak');
@@ -423,11 +528,16 @@ try {
   const ev = data.events.find((e) => e.name === 'Genesis Scottish Open');
   realField = ev.competitions[0].competitors.map((c) => {
     const rounds = {};
-    for (const ls of c.linescores || []) rounds[ls.period] = toPar(ls.displayValue);
+    const holes = {};
+    for (const ls of c.linescores || []) {
+      rounds[ls.period] = toPar(ls.displayValue);
+      holes[ls.period] = (ls.linescores || []).length;
+    }
     return {
       id: c.id,
       name: c.athlete.displayName,
       rounds,
+      holes,
       roundsPlayed: Object.keys(rounds).length,
       total: toPar(c.score),
     };
@@ -445,6 +555,20 @@ check('feed parses: both 4-round and 2-round players present', () => {
   log(`      ${made} made the cut, ${missed} missed`, 'note');
 });
 
+check('ESPN really does give 18 holes per completed round (the fix depends on it)', () => {
+  // If ESPN ever stopped nesting the hole-by-hole card, every round would look
+  // "in progress" and no penalty would ever be charged. Assert the shape.
+  let checked = 0;
+  for (const p of realField) {
+    for (const [round, count] of Object.entries(p.holes)) {
+      assert.equal(count, 18, `${p.name} round ${round} has ${count} holes, expected 18`);
+      checked++;
+    }
+  }
+  assert.ok(checked > 400, `expected hundreds of completed rounds, saw ${checked}`);
+  log(`      ${checked} completed rounds, all carrying a full 18-hole card`, 'note');
+});
+
 check('our per-round parsing sums to ESPN’s own total for every finisher', () => {
   for (const p of realField.filter((x) => x.roundsPlayed === 4)) {
     const sum = Object.values(p.rounds).reduce((a, b) => a + b, 0);
@@ -454,7 +578,10 @@ check('our per-round parsing sums to ESPN’s own total for every finisher', () 
 
 check('a penalised cut golfer ends up worse than the last-place finisher', () => {
   const { penalties } = computeStandings(board(realField));
-  assert.ok(penalties[3] > 0 && penalties[4] > 0, 'expected positive worst-round penalties');
+  const r3 = penalties[3].score;
+  const r4 = penalties[4].score;
+  assert.ok(r3 > 0 && r4 > 0, 'expected positive worst-round penalties');
+  assert.equal(penalties[4].settled, true, 'a finished event has no one still out there');
 
   const worstFinisher = Math.max(
     ...realField.filter((p) => p.roundsPlayed === 4).map((p) => p.total),
@@ -462,13 +589,13 @@ check('a penalised cut golfer ends up worse than the last-place finisher', () =>
   const bestCutPlayer = Math.min(
     ...realField.filter((p) => p.roundsPlayed === 2).map((p) => p.total),
   );
-  const penalised = bestCutPlayer + penalties[3] + penalties[4];
+  const penalised = bestCutPlayer + r3 + r4;
   assert.ok(
     penalised > worstFinisher,
     `best cut player lands at ${penalised}, last finisher ${worstFinisher}`,
   );
   log(
-    `      penalty R3 ${formatToPar(penalties[3])}, R4 ${formatToPar(penalties[4])} — ` +
+    `      penalty R3 ${formatToPar(r3)}, R4 ${formatToPar(r4)} — ` +
       `even the best missed-cut player lands at ${formatToPar(penalised)}, ` +
       `behind the last finisher at ${formatToPar(worstFinisher)}`,
     'note',

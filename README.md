@@ -16,6 +16,20 @@ leaderboard straight from ESPN in the browser and recomputes the standings every
   misses the cut keeps their real 36-hole score and then takes the field's worst
   round twice. (In the 2026 Scottish Open that would have been +9 and +7 — enough
   to put even the best missed-cut player behind the last-place finisher.)
+
+### How the penalty updates live
+
+Only **completed** rounds count toward "worst in the field". A player three holes
+into a round sitting at +1 has not shot +1 — counting them would make the penalty
+read far too soft all morning and then lurch when the stragglers signed their
+cards.
+
+Restricting it to finished 18s makes the number honest at every moment. It starts
+as soon as the first card is signed and can only ever **rise** as more players
+come in — a manager never sees their penalty move in their favour. While anyone is
+still on the course it is shown as *provisional*, with a count of how many can
+still post worse; once the last card is in, it is final. No polling interval or
+end-of-day batch job is needed: it converges by itself.
 - **Ties** are broken by whose **predicted winning score** is closest to the
   actual winning score.
 

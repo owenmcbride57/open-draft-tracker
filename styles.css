@@ -226,17 +226,6 @@ main {
   border-radius: 2px;
 }
 
-.track-end {
-  position: absolute;
-  top: 36px;
-  font-family: var(--mono);
-  font-size: 0.65rem;
-  color: #3c5c4d;
-}
-
-.track-end.left { left: 0; }
-.track-end.right { right: 0; }
-
 .dot {
   position: absolute;
   top: 21px;
@@ -261,15 +250,32 @@ main {
   color: var(--muted);
 }
 
+/* The live leader — green, so it reads as "the real score" against the neutral
+   grey prediction dots. */
 .leader-marker {
   position: absolute;
-  top: 6px;
-  bottom: 22px;
+  top: 8px;
+  bottom: 20px;
   width: 2px;
   margin-left: -1px;
-  background: var(--gold);
+  background: var(--green);
   border-radius: 2px;
 }
+
+.leader-dot {
+  position: absolute;
+  bottom: -5px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--green);
+  border: 2px solid var(--bg);
+}
+
+.leader-marker.edge-left .leader-marker-label { left: 0; transform: none; }
+.leader-marker.edge-right .leader-marker-label { left: auto; right: 0; transform: none; }
 
 .leader-marker-label {
   position: absolute;
@@ -278,11 +284,12 @@ main {
   transform: translateX(-50%);
   margin-bottom: 3px;
   font-family: var(--mono);
-  font-size: 0.68rem;
+  font-size: 0.66rem;
   font-weight: 700;
-  color: #0b1410;
-  background: var(--gold);
-  padding: 0.05rem 0.3rem;
+  letter-spacing: 0.04em;
+  color: #06210f;
+  background: var(--green);
+  padding: 0.1rem 0.35rem;
   border-radius: 4px;
   white-space: nowrap;
 }
@@ -390,7 +397,7 @@ main {
 
 .golfer-row {
   display: grid;
-  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr) auto auto 3.5rem;
+  grid-template-columns: minmax(8rem, 1fr) minmax(0, 1.35fr) auto auto 3.5rem;
   align-items: center;
   gap: 0.75rem;
   padding: 0.7rem 1rem;
@@ -404,12 +411,17 @@ main {
 
 .g-name { font-weight: 600; font-size: 0.95rem; }
 
+/* Scheffler is owned by seven managers. Truncating that to "…" hid exactly the
+   information the row exists to convey, so let it wrap onto a second line. */
 .g-owners {
   font-size: 0.75rem;
   color: var(--muted);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1.45;
+}
+
+.g-owners .count {
+  color: var(--text);
+  font-weight: 600;
 }
 
 .g-rounds { display: flex; gap: 0.3rem; }
