@@ -5,7 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Draft Order — The Open 2026</title>
     <link rel="preconnect" href="https://site.api.espn.com" />
-    <link rel="stylesheet" href="./styles.css" />
+    <!--
+      ?v= pins every asset to one version. GitHub Pages caches each file
+      independently, so without this a browser can end up holding a new app.js
+      alongside a stale scoring.js and the board breaks. Bump this number (in
+      BOTH places below) on every deploy that changes JS or CSS.
+    -->
+    <link rel="stylesheet" href="./styles.css?v=2" />
   </head>
   <body>
     <header class="masthead">
@@ -62,6 +68,6 @@
       </p>
     </footer>
 
-    <script type="module" src="./app.js"></script>
+    <script type="module" src="./app.js?v=2"></script>
   </body>
 </html>

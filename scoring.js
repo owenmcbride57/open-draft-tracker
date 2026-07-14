@@ -1,4 +1,8 @@
-import { EVENT, GOLFERS, ENTRIES } from './config.js';
+// Inherit the version we were loaded at (see index.html) so config.js can't be
+// served from a different cache generation than this file.
+const { EVENT, GOLFERS, ENTRIES } = await import(
+  `./config.js${new URL(import.meta.url).search}`
+);
 
 const SCOREBOARD = 'https://site.api.espn.com/apis/site/v2/sports/golf/pga/scoreboard';
 

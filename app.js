@@ -1,5 +1,10 @@
-import { REFRESH_SECONDS } from './config.js';
-import { fetchLeaderboard, computeStandings, formatToPar } from './scoring.js';
+// Load our dependencies at the same version this file was loaded at, so a cached
+// app.js can never be paired with a differently-cached scoring.js. index.html
+// sets ?v=N on this script; we pass it straight down the import graph.
+const V = new URL(import.meta.url).search;
+
+const { REFRESH_SECONDS } = await import(`./config.js${V}`);
+const { fetchLeaderboard, computeStandings, formatToPar } = await import(`./scoring.js${V}`);
 
 const boardEl = document.getElementById('board');
 const statusEl = document.getElementById('status-line');

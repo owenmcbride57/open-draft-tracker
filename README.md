@@ -82,6 +82,28 @@ Open `tests.html` in a browser. It checks the cut penalty, the ranking, the
 tiebreak and the dead-heat detection, and validates the parsing against a real
 completed ESPN leaderboard.
 
+## Deploying a change
+
+GitHub Pages caches each file separately, so a browser can otherwise end up
+holding a new `app.js` next to a stale `scoring.js` — which breaks the board with
+an undefined-property error rather than failing safe.
+
+To prevent that, `index.html` pins the whole module graph to one version:
+
+```html
+<link rel="stylesheet" href="./styles.css?v=2" />
+<script type="module" src="./app.js?v=2"></script>
+```
+
+`app.js` and `scoring.js` read that `?v=` off their own URL and pass it down to
+everything they import. So the only file that can be stale is `index.html`, and a
+stale `index.html` simply loads the previous version of *everything* — old but
+consistent, never mixed.
+
+**When you change any JS or CSS, bump both numbers in `index.html`.** Forgetting
+means returning visitors keep the old version for a few minutes; it does not
+break the page.
+
 ## Editing the league
 
 Everything you'd want to change lives in `config.js`: the golfers (pinned by ESPN
