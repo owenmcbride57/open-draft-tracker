@@ -6,6 +6,7 @@ const statusEl = document.getElementById('status-line');
 const refreshEl = document.getElementById('refresh-line');
 const errorEl = document.getElementById('error');
 const leaderNoteEl = document.getElementById('leader-note');
+const refreshBtn = document.getElementById('refresh');
 
 const ORDINALS = ['1st', '2nd', '3rd', '4th', '5th', '6th', '7th', '8th', '9th', '10th'];
 
@@ -123,29 +124,63 @@ function render(board, standings) {
       (applied.length ? ` Missed-cut penalty: ${applied.join(', ')}.` : '');
   }
 
-  refreshEl.textContent = DEMO
-    ? 'DEMO — replaying a finished event, not real Open scores'
-    : `Updated ${new Date().toLocaleTimeString([], {
-        hour: 'numeric',
-        minute: '2-digit',
-      })}`;
+  lastUpdated = Date.now();
+  paintFreshness();
 }
 
 // ?demo replays a finished tournament so the league can see the live board
 // (rankings, cut penalties, tiebreaks) before The Open starts.
 const DEMO = new URLSearchParams(location.search).has('demo');
 
+let lastUpdated = null;
+let inFlight = false;
+
+// Show how stale the board is rather than leaving people to guess. ESPN serves
+// this feed with cache-control: max-age=1, so anything we show is at most as old
+// as our last poll.
+function paintFreshness() {
+  if (DEMO) {
+    refreshEl.textContent = 'DEMO — replaying a finished event, not real Open scores';
+    return;
+  }
+  if (inFlight) {
+    refreshEl.textContent = 'Refreshing…';
+    return;
+  }
+  if (lastUpdated == null) return;
+
+  const secs = Math.round((Date.now() - lastUpdated) / 1000);
+  if (secs < 5) refreshEl.textContent = 'Updated just now';
+  else if (secs < 90) refreshEl.textContent = `Updated ${secs}s ago`;
+  else refreshEl.textContent = `Updated ${Math.round(secs / 60)} min ago`;
+}
+
 async function tick() {
+  if (inFlight) return;
+  inFlight = true;
+  refreshBtn.disabled = true;
+  paintFreshness();
+
   try {
     const board = await fetchLeaderboard({ demo: DEMO });
+    inFlight = false;
     render(board, computeStandings(board));
     errorEl.hidden = true;
     if (DEMO) document.body.classList.add('demo');
   } catch (err) {
+    inFlight = false;
     errorEl.hidden = false;
     errorEl.textContent = `Couldn't load scores: ${err.message}. Retrying in ${REFRESH_SECONDS}s.`;
+    paintFreshness();
+  } finally {
+    inFlight = false;
+    refreshBtn.disabled = false;
   }
 }
 
+refreshBtn.addEventListener('click', tick);
+
 tick();
 setInterval(tick, REFRESH_SECONDS * 1000);
+// Tick the "updated Xs ago" label independently of the network poll.
+setInterval(paintFreshness, 1000);

@@ -29,16 +29,16 @@ export const GOLFERS = {
 // Each manager's three picks, plus their predicted winning score (to par),
 // which breaks ties.
 export const ENTRIES = [
-  { manager: 'Owen',           picks: ['scheffler', 'mcilroy', 'morikawa'],       prediction: -9 },
-  { manager: 'Braddy',         picks: ['scheffler', 'fleetwood', 'fitzpatrick'],  prediction: -8 },
-  { manager: 'Saunders',       picks: ['mcilroy', 'rose', 'young'],               prediction: -12 },
-  { manager: 'Matthew Ferrel', picks: ['fitzpatrick', 'scheffler', 'rose'],       prediction: -10 },
-  { manager: 'Tom Doc',        picks: ['young', 'fleetwood', 'aberg'],            prediction: -8 },
-  { manager: 'Harry',          picks: ['mcilroy', 'rahm', 'dechambeau'],          prediction: -5 },
-  { manager: 'Tom Sweeney',    picks: ['mcilroy', 'scheffler', 'fitzpatrick'],    prediction: -11 },
-  { manager: 'AJ',             picks: ['scheffler', 'morikawa', 'fleetwood'],     prediction: -16 },
-  { manager: 'Pj',             picks: ['scheffler', 'fitzpatrick', 'fleetwood'],  prediction: -9 },
-  { manager: 'Coop',           picks: ['scheffler', 'fitzpatrick', 'hovland'],    prediction: -15 },
+  { manager: 'Owen',                     picks: ['scheffler', 'mcilroy', 'morikawa'],      prediction: -9 },
+  { manager: 'Braddy',                   picks: ['scheffler', 'fleetwood', 'fitzpatrick'], prediction: -8 },
+  { manager: 'Goon',                     picks: ['mcilroy', 'rose', 'young'],              prediction: -12 },
+  { manager: 'Ferrell',                  picks: ['fitzpatrick', 'scheffler', 'rose'],      prediction: -10 },
+  { manager: 'Doc',                      picks: ['young', 'fleetwood', 'aberg'],           prediction: -8 },
+  { manager: 'Harry',                    picks: ['mcilroy', 'rahm', 'dechambeau'],         prediction: -5 },
+  { manager: 'Sweeney',                  picks: ['mcilroy', 'scheffler', 'fitzpatrick'],   prediction: -11 },
+  { manager: 'AJ',                       picks: ['scheffler', 'morikawa', 'fleetwood'],    prediction: -16 },
+  { manager: 'Patrick John Kealy III',   picks: ['scheffler', 'fitzpatrick', 'fleetwood'], prediction: -9 },
+  { manager: 'Coop',                     picks: ['scheffler', 'fitzpatrick', 'hovland'],   prediction: -15 },
 ];
 
 // How often to re-pull the leaderboard, in seconds.

@@ -69,11 +69,34 @@ h1 span { color: var(--muted); font-weight: 400; }
   font-size: 0.95rem;
 }
 
+.refresh-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  justify-content: flex-end;
+  margin-top: 0.3rem;
+}
+
 .refresh-line {
-  margin: 0.15rem 0 0;
+  margin: 0;
   font-size: 0.78rem;
   color: var(--muted);
 }
+
+.refresh-btn {
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text);
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 0.25rem 0.7rem;
+  cursor: pointer;
+}
+
+.refresh-btn:hover:not(:disabled) { border-color: var(--gold); color: var(--gold); }
+.refresh-btn:disabled { opacity: 0.5; cursor: default; }
 
 .rules-bar {
   max-width: 960px;
@@ -301,6 +324,7 @@ footer p { margin: 0; }
   h1 { font-size: 1.5rem; }
   .masthead-inner { align-items: flex-start; }
   .status-block { text-align: left; }
+  .refresh-row { justify-content: flex-start; }
 
   .entry-head {
     grid-template-columns: 2.5rem minmax(0, 1fr) 3.75rem;

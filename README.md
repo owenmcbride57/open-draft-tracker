@@ -21,14 +21,37 @@ leaderboard straight from ESPN in the browser and recomputes the standings every
 
 ### One thing the rules don't cover
 
-The tiebreaker can itself tie. Owen and Pj both predicted −9, so if they ever
-finish level on combined score, nothing separates them. Two predictions can also
-sit an equal distance either side of the winning score — if the winner finishes
-at −10, then −9 and −11 are both exactly one stroke off.
+The tiebreaker can itself tie. Owen and Patrick John Kealy III both predicted −9,
+so if they ever finish level on combined score, nothing separates them. Two
+predictions can also sit an equal distance either side of the winning score — if
+the winner finishes at −10, then −9 and −11 are both exactly one stroke off.
 
 The dashboard does not paper over this. When it happens the affected managers get
 a red **"dead heat — league must settle"** badge instead of a silently invented
-order. Agree a rule in advance if you want to avoid an argument on draft night.
+order. The league has agreed to settle any such tie after the fact.
+
+## How live is it?
+
+ESPN serves this feed with `cache-control: max-age=1` — it is not cached, so
+every poll gets genuinely current data. The real latency is upstream: a score
+appears once a player finishes a hole and the walking scorer enters it, which is
+typically 30–90 seconds behind the shot itself.
+
+The board polls every 60 seconds, shows an **"Updated Xs ago"** label so nobody
+has to guess how stale it is, and has a **Refresh** button for anyone who wants
+to pull immediately. The button disables itself mid-request so an impatient
+league can't stack up duplicate fetches.
+
+## Why there's no database
+
+The page holds no state: every poll recomputes the standings from ESPN and throws
+the previous answer away. There is nothing to go stale, drift, or need a backup.
+
+A database would introduce a *second* copy of the truth that can disagree with the
+first — the classic failure being a golfer WDing, ESPN revising a scorecard, and a
+stored row keeping the old number while the board reports it confidently. The
+parsing is verified exact against real data (see Tests), so recomputing from
+source every time is the more reliable option, not the lazier one.
 
 ## Running it
 

@@ -172,15 +172,15 @@ check('ties are broken by the prediction closest to the winning score', () => {
   assert.equal(winningScore, -10);
   assert.ok(rows.every((r) => r.total === 0), 'everyone should be tied on score');
 
-  assert.equal(rows[0].manager, 'Matthew Ferrel', 'predicted -10, exactly right');
+  assert.equal(rows[0].manager, 'Ferrell', 'predicted -10, exactly right');
   assert.equal(rows[0].tiebreak, 0);
 
-  // Owen (-9), Pj (-9) and Tom Sweeney (-11) are all exactly 1 off. The
-  // tiebreaker does not separate them, so they are ordered alphabetically.
-  // See "unresolved ties" below.
+  // Owen (-9), Patrick John Kealy III (-9) and Sweeney (-11) are all exactly
+  // 1 off. The tiebreaker does not separate them, so they are ordered
+  // alphabetically. See "unresolved ties" below.
   assert.deepEqual(
     rows.slice(1, 4).map((r) => r.manager),
-    ['Owen', 'Pj', 'Tom Sweeney'],
+    ['Owen', 'Patrick John Kealy III', 'Sweeney'],
     'the three managers 1 stroke off should sort together',
   );
   assert.ok(rows.slice(1, 4).every((r) => r.tiebreak === 1));
@@ -193,9 +193,10 @@ check('ties are broken by the prediction closest to the winning score', () => {
 group('unresolved ties');
 
 check('managers level on score AND equally off on prediction are flagged, not silently ordered', () => {
-  // Owen and Pj both predicted -9, so if they tie on combined score the
-  // tiebreaker can never separate them. And with the winner at -12, Coop (-15)
-  // is 3 off too — a three-way dead heat the rules as written cannot settle.
+  // Owen and Patrick John Kealy III both predicted -9, so if they tie on
+  // combined score the tiebreaker can never separate them. And with the winner
+  // at -12, Coop (-15) is 3 off too — a three-way dead heat the rules as
+  // written cannot settle.
   const field = [
     ...Object.values(GOLFERS).map((g) => player(g.name, [0, 0, 0, 0], g.id)),
     player('Some Winner', [-3, -3, -3, -3], 'w1'), // -12
@@ -204,7 +205,7 @@ check('managers level on score AND equally off on prediction are flagged, not si
   assert.equal(winningScore, -12);
 
   const owen = rows.find((r) => r.manager === 'Owen');
-  const pj = rows.find((r) => r.manager === 'Pj');
+  const pj = rows.find((r) => r.manager === 'Patrick John Kealy III');
   const coop = rows.find((r) => r.manager === 'Coop');
 
   assert.equal(owen.total, pj.total, 'tied on combined score');
@@ -214,19 +215,19 @@ check('managers level on score AND equally off on prediction are flagged, not si
   assert.ok(owen.unresolved && pj.unresolved && coop.unresolved, 'all three flagged');
   assert.deepEqual(
     owen.unresolvedWith,
-    ['Coop', 'Pj'],
+    ['Coop', 'Patrick John Kealy III'],
     'Owen should be told exactly who he is still level with',
   );
 });
 
 check('a manager whose prediction is unique among the tied group is resolved cleanly', () => {
-  // Winner at -10: Matthew Ferrel predicted -10 exactly, nobody else did.
+  // Winner at -10: Ferrell predicted -10 exactly, nobody else did.
   const field = [
     ...Object.values(GOLFERS).map((g) => player(g.name, [0, 0, 0, 0], g.id)),
     player('Some Winner', [-4, -3, -2, -1], 'w1'), // -10
   ];
   const { rows } = computeStandings(board(field));
-  const ferrel = rows.find((r) => r.manager === 'Matthew Ferrel');
+  const ferrel = rows.find((r) => r.manager === 'Ferrell');
   assert.equal(ferrel.pick, 1, 'nailed the prediction, so picks first');
   assert.equal(ferrel.tiedOnScore, true, 'was tied on score...');
   assert.equal(ferrel.unresolved, false, '...but the prediction settled it outright');
