@@ -21,7 +21,7 @@ leaderboard straight from ESPN in the browser and recomputes the standings every
 
 ### One thing the rules don't cover
 
-The tiebreaker can itself tie. Owen and Patrick John Kealy III both predicted −9,
+The tiebreaker can itself tie. Jack and Patrick John Kealy III both predicted −9,
 so if they ever finish level on combined score, nothing separates them. Two
 predictions can also sit an equal distance either side of the winning score — if
 the winner finishes at −10, then −9 and −11 are both exactly one stroke off.

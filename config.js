@@ -29,7 +29,7 @@ export const GOLFERS = {
 // Each manager's three picks, plus their predicted winning score (to par),
 // which breaks ties.
 export const ENTRIES = [
-  { manager: 'Owen',                     picks: ['scheffler', 'mcilroy', 'morikawa'],      prediction: -9 },
+  { manager: 'Jack',                     picks: ['scheffler', 'mcilroy', 'morikawa'],      prediction: -9 },
   { manager: 'Braddy',                   picks: ['scheffler', 'fleetwood', 'fitzpatrick'], prediction: -8 },
   { manager: 'Goon',                     picks: ['mcilroy', 'rose', 'young'],              prediction: -12 },
   { manager: 'Ferrell',                  picks: ['fitzpatrick', 'scheffler', 'rose'],      prediction: -10 },

@@ -93,8 +93,8 @@ check('a cut golfer is charged the field worst for R3 and R4', () => {
     player('Grinder B', [2, 2, 4, 11], 'x2'), // worst R4 = +11
   ];
   const { rows } = computeStandings(board(field));
-  const owen = rows.find((r) => r.manager === 'Owen');
-  const s = owen.golfers.find((g) => g.id === id('scheffler'));
+  const jack = rows.find((r) => r.manager === 'Jack');
+  const s = jack.golfers.find((g) => g.id === id('scheffler'));
 
   assert.equal(s.cut, true, 'should be flagged as cut');
   assert.deepEqual(
@@ -103,7 +103,7 @@ check('a cut golfer is charged the field worst for R3 and R4', () => {
     'should take the field worst in each missed round',
   );
   assert.equal(s.total, 30, '5 + 5 + 9 + 11');
-  assert.equal(owen.total, 18, 'Scheffler 30 + McIlroy -12 + Morikawa 0');
+  assert.equal(jack.total, 18, 'Scheffler 30 + McIlroy -12 + Morikawa 0');
 });
 
 check('a golfer who made the cut takes no penalty', () => {
@@ -114,12 +114,12 @@ check('a golfer who made the cut takes no penalty', () => {
     player('Grinder A', [2, 2, 12, 12], 'x1'),
   ];
   const { rows } = computeStandings(board(field));
-  const owen = rows.find((r) => r.manager === 'Owen');
-  for (const g of owen.golfers) {
+  const jack = rows.find((r) => r.manager === 'Jack');
+  for (const g of jack.golfers) {
     assert.equal(g.cut, false, `${g.name} should not be cut`);
     assert.equal(g.penaltyRounds.length, 0);
   }
-  assert.equal(owen.total, -12, '-8 + -4 + 0');
+  assert.equal(jack.total, -12, '-8 + -4 + 0');
 });
 
 check('no penalty for rounds that have not started yet', () => {
@@ -131,9 +131,9 @@ check('no penalty for rounds that have not started yet', () => {
   ];
   const { rows, roundsStarted } = computeStandings(board(field));
   assert.equal(roundsStarted, 2);
-  const owen = rows.find((r) => r.manager === 'Owen');
-  assert.equal(owen.total, 4, 'just the 36-hole totals: 8 + -4 + 0');
-  assert.ok(owen.golfers.every((g) => !g.cut), 'nobody is cut before R3 exists');
+  const jack = rows.find((r) => r.manager === 'Jack');
+  assert.equal(jack.total, 4, 'just the 36-hole totals: 8 + -4 + 0');
+  assert.ok(jack.golfers.every((g) => !g.cut), 'nobody is cut before R3 exists');
 });
 
 group('ranking + tiebreak');
@@ -175,12 +175,12 @@ check('ties are broken by the prediction closest to the winning score', () => {
   assert.equal(rows[0].manager, 'Ferrell', 'predicted -10, exactly right');
   assert.equal(rows[0].tiebreak, 0);
 
-  // Owen (-9), Patrick John Kealy III (-9) and Sweeney (-11) are all exactly
+  // Jack (-9), Patrick John Kealy III (-9) and Sweeney (-11) are all exactly
   // 1 off. The tiebreaker does not separate them, so they are ordered
   // alphabetically. See "unresolved ties" below.
   assert.deepEqual(
     rows.slice(1, 4).map((r) => r.manager),
-    ['Owen', 'Patrick John Kealy III', 'Sweeney'],
+    ['Jack', 'Patrick John Kealy III', 'Sweeney'],
     'the three managers 1 stroke off should sort together',
   );
   assert.ok(rows.slice(1, 4).every((r) => r.tiebreak === 1));
@@ -193,7 +193,7 @@ check('ties are broken by the prediction closest to the winning score', () => {
 group('unresolved ties');
 
 check('managers level on score AND equally off on prediction are flagged, not silently ordered', () => {
-  // Owen and Patrick John Kealy III both predicted -9, so if they tie on
+  // Jack and Patrick John Kealy III both predicted -9, so if they tie on
   // combined score the tiebreaker can never separate them. And with the winner
   // at -12, Coop (-15) is 3 off too — a three-way dead heat the rules as
   // written cannot settle.
@@ -204,19 +204,19 @@ check('managers level on score AND equally off on prediction are flagged, not si
   const { rows, winningScore } = computeStandings(board(field));
   assert.equal(winningScore, -12);
 
-  const owen = rows.find((r) => r.manager === 'Owen');
+  const jack = rows.find((r) => r.manager === 'Jack');
   const pj = rows.find((r) => r.manager === 'Patrick John Kealy III');
   const coop = rows.find((r) => r.manager === 'Coop');
 
-  assert.equal(owen.total, pj.total, 'tied on combined score');
-  assert.equal(owen.tiebreak, 3);
+  assert.equal(jack.total, pj.total, 'tied on combined score');
+  assert.equal(jack.tiebreak, 3);
   assert.equal(pj.tiebreak, 3);
   assert.equal(coop.tiebreak, 3);
-  assert.ok(owen.unresolved && pj.unresolved && coop.unresolved, 'all three flagged');
+  assert.ok(jack.unresolved && pj.unresolved && coop.unresolved, 'all three flagged');
   assert.deepEqual(
-    owen.unresolvedWith,
+    jack.unresolvedWith,
     ['Coop', 'Patrick John Kealy III'],
-    'Owen should be told exactly who he is still level with',
+    'Jack should be told exactly who he is still level with',
   );
 });
 

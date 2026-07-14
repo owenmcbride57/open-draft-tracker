@@ -182,7 +182,7 @@ export function computeStandings(board) {
 
   // Flag rows whose position was decided by the tiebreaker, and — importantly —
   // rows the tiebreaker could NOT decide. Several managers predicted the same
-  // score (Owen and Pj both said -9), and two predictions can also sit an equal
+  // score (Jack and Patrick both said -9), and two predictions can also sit an equal
   // distance either side of the winning score. In those cases the order below is
   // arbitrary and the league has to settle it, so say so rather than pretending.
   rows.forEach((row, i) => {
