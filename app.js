@@ -17,6 +17,37 @@ const leaderNamesEl = document.getElementById('leader-names');
 const closestEl = document.getElementById('closest');
 const trackEl = document.getElementById('track');
 const predListEl = document.getElementById('pred-list');
+const cutLineEl = document.getElementById('cut-line');
+const cutNoteEl = document.getElementById('cut-note');
+const golferBoardEl = document.getElementById('golfer-board');
+
+// ---------------------------------------------------------------------------
+// Tabs. Driven off the URL hash so a link to a specific view survives a reload
+// and can be shared into the group chat.
+// ---------------------------------------------------------------------------
+
+const VIEWS = ['draft', 'tracker', 'golfers'];
+
+function showView(name) {
+  const view = VIEWS.includes(name) ? name : 'draft';
+  for (const el of document.querySelectorAll('.panel-view')) {
+    el.hidden = el.dataset.view !== view;
+  }
+  for (const el of document.querySelectorAll('.tab')) {
+    const active = el.dataset.tab === view;
+    el.classList.toggle('active', active);
+    el.setAttribute('aria-selected', active);
+  }
+}
+
+for (const tab of document.querySelectorAll('.tab')) {
+  tab.addEventListener('click', () => {
+    location.hash = tab.dataset.tab;
+  });
+}
+
+window.addEventListener('hashchange', () => showView(location.hash.slice(1)));
+showView(location.hash.slice(1));
 
 const ORDINALS = ['1st', '2nd', '3rd', '4th', '5th', '6th', '7th', '8th', '9th', '10th'];
 
@@ -194,10 +225,90 @@ function renderLeaderPanel({ winningScore, leaders = [], predictions = [] }) {
     .join('');
 }
 
+// Every drafted golfer, ranked, with the cut line drawn straight through the
+// list — above it you're surviving, below it you're going home.
+function renderGolferBoard({ cut, golferBoard, roundsStarted }) {
+  if (!cutLineEl || !cutNoteEl || !golferBoardEl) return;
+
+  cutLineEl.textContent = cut.line == null ? '—' : formatToPar(cut.line);
+  cutLineEl.classList.toggle('is-live', cut.line != null);
+
+  cutNoteEl.textContent =
+    roundsStarted === 0
+      ? 'Not started. The Open cuts to the top 70 and ties after 36 holes.'
+      : cut.decided
+        ? 'Final — the cut has been made.'
+        : 'Projected: top 70 and ties. This line moves as the field posts scores.';
+
+  const rounds = (g) => {
+    const cells = [];
+    for (let r = 1; r <= 4; r++) {
+      const played = g.rounds?.[r] != null;
+      cells.push(
+        `<span class="round ${played ? 'played' : 'pending'}">${
+          played ? formatToPar(g.rounds[r]) : '·'
+        }</span>`,
+      );
+    }
+    return cells.join('');
+  };
+
+  const row = (g) => {
+    if (!g.found) {
+      return `<li class="golfer-row missing">
+        <span class="g-name">${g.name}</span>
+        <span class="g-note">not in field</span>
+      </li>`;
+    }
+
+    // How comfortable are they? Only meaningful while the cut is still in play.
+    let margin = '';
+    if (g.toCut != null && !cut.decided) {
+      if (g.toCut < 0) margin = `<span class="margin in">${Math.abs(g.toCut)} inside</span>`;
+      else if (g.toCut === 0) margin = '<span class="margin edge">on the line</span>';
+      else margin = `<span class="margin out">${g.toCut} outside</span>`;
+    } else if (cut.decided) {
+      margin = g.madeCut
+        ? '<span class="margin in">made the cut</span>'
+        : '<span class="margin out">missed the cut</span>';
+    }
+
+    // Before there's a cut line nobody is outside it — render them neutrally
+    // rather than greying the whole field out as if they'd all missed.
+    const standing = cut.line == null ? 'neutral' : g.inside ? 'inside' : 'outside';
+
+    return `<li class="golfer-row ${standing}">
+      <span class="g-name">${g.name}</span>
+      <span class="g-owners">${g.owners.join(', ')}</span>
+      <span class="g-rounds">${rounds(g)}</span>
+      ${margin}
+      <span class="g-total">${formatToPar(g.total)}</span>
+    </li>`;
+  };
+
+  // Split the list where the cut falls, and put an actual line there.
+  const inside = golferBoard.filter((g) => g.found && g.inside);
+  const outside = golferBoard.filter((g) => g.found && !g.inside);
+  const absent = golferBoard.filter((g) => !g.found);
+
+  const divider =
+    cut.line == null
+      ? ''
+      : `<li class="cut-divider">
+           <span>${cut.decided ? 'CUT' : 'PROJECTED CUT'} — ${formatToPar(cut.line)}</span>
+         </li>`;
+
+  golferBoardEl.innerHTML =
+    roundsStarted === 0
+      ? golferBoard.map(row).join('')
+      : inside.map(row).join('') + divider + outside.map(row).join('') + absent.map(row).join('');
+}
+
 function render(board, standings) {
   const { rows, roundsStarted, penalties, winningScore } = standings;
 
   renderLeaderPanel(standings);
+  renderGolferBoard(standings);
 
   // A pick number only means something once someone has actually posted a score.
   const live = roundsStarted > 0;

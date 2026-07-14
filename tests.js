@@ -287,6 +287,96 @@ check('before the tournament starts there is no leader and no closest prediction
   assert.equal(predictions[predictions.length - 1].manager, 'Harry');
 });
 
+group('cut line');
+
+check('projects the cut at the 70th player and ties while rounds 1-2 are live', () => {
+  // 50 players at -1, then our 11 golfers at E (places 51-61), then a block at
+  // +3 covering places 62 onward. The 70th score therefore falls at +3, so that
+  // is the line — and our golfers sit 3 strokes inside it.
+  const filler = [];
+  for (let i = 0; i < 50; i++) filler.push(player(`Good ${i}`, [-1, 0], `g${i}`));
+  for (let i = 0; i < 10; i++) filler.push(player(`Edge ${i}`, [1, 2], `e${i}`)); // +3
+  for (let i = 0; i < 26; i++) filler.push(player(`Bad ${i}`, [4, 5], `b${i}`)); // +9
+
+  const field = [
+    ...Object.values(GOLFERS).map((g) => player(g.name, [0, 0], g.id)), // E
+    ...filler,
+  ];
+  const { cut, golferBoard } = computeStandings(board(field));
+
+  assert.equal(cut.decided, false, 'still a projection during round 2');
+  assert.equal(cut.line, 3, 'the 70th score is +3');
+
+  // Our golfers are all at E, comfortably inside a +3 line.
+  const scheffler = golferBoard.find((g) => g.id === GOLFERS.scheffler.id);
+  assert.equal(scheffler.inside, true);
+  assert.equal(scheffler.toCut, -3, 'E is 3 strokes inside a +3 line');
+});
+
+check('a golfer level with the line is inside it — "and ties"', () => {
+  const filler = [];
+  for (let i = 0; i < 69; i++) filler.push(player(`Good ${i}`, [-2, -2], `g${i}`)); // -4
+  for (let i = 0; i < 30; i++) filler.push(player(`Bad ${i}`, [5, 5], `b${i}`)); // +10
+
+  // Put Scheffler exactly on the 70th score.
+  const field = [
+    player('Scottie Scheffler', [-2, -2], GOLFERS.scheffler.id), // -4, ties the line
+    ...filler,
+  ];
+  const { cut, golferBoard } = computeStandings(board(field));
+  const scheffler = golferBoard.find((g) => g.id === GOLFERS.scheffler.id);
+
+  assert.equal(cut.line, -4);
+  assert.equal(scheffler.toCut, 0, 'exactly on the line');
+  assert.equal(scheffler.inside, true, 'ties survive the cut, they are not eliminated');
+});
+
+check('once round 3 starts the cut is a fact, not a projection', () => {
+  const field = [
+    // Survived: has a third round.
+    player('Scottie Scheffler', [0, 0, -2, -2], GOLFERS.scheffler.id),
+    // Did not: stopped at 36 holes.
+    player('Rory McIlroy', [4, 4], GOLFERS.mcilroy.id),
+    player('Grinder', [2, 3, 1, 1], 'x1'), // survived at +5 through 36
+    player('Gone', [6, 6], 'x2'),
+  ];
+  const { cut, golferBoard } = computeStandings(board(field));
+
+  assert.equal(cut.decided, true, 'round 3 exists, so the cut has happened');
+  assert.equal(cut.line, 5, 'worst 36-hole total among survivors: Grinder at +5');
+
+  const scheffler = golferBoard.find((g) => g.id === GOLFERS.scheffler.id);
+  const rory = golferBoard.find((g) => g.id === GOLFERS.mcilroy.id);
+
+  assert.equal(scheffler.madeCut, true);
+  assert.equal(scheffler.inside, true);
+  assert.equal(rory.madeCut, false, 'no third round means no cut made');
+  assert.equal(rory.inside, false);
+});
+
+check('every drafted golfer is listed, with the managers who picked them', () => {
+  const field = Object.values(GOLFERS).map((g) => player(g.name, [0, 0], g.id));
+  const { golferBoard } = computeStandings(board(field));
+
+  assert.equal(golferBoard.length, Object.keys(GOLFERS).length, 'all 11 golfers listed');
+
+  // Scheffler was the most popular pick — he should carry several owners.
+  const scheffler = golferBoard.find((g) => g.id === GOLFERS.scheffler.id);
+  assert.ok(scheffler.owners.includes('Jack'), 'Jack picked Scheffler');
+  assert.ok(scheffler.owners.length >= 5, `expected many owners, got ${scheffler.owners.length}`);
+
+  // Hovland was picked by exactly one person.
+  const hovland = golferBoard.find((g) => g.id === GOLFERS.hovland.id);
+  assert.deepEqual(hovland.owners, ['Coop']);
+});
+
+check('no cut line before anyone has teed off', () => {
+  const field = Object.values(GOLFERS).map((g) => player(g.name, [], g.id));
+  const { cut } = computeStandings(board(field, { started: false }));
+  assert.equal(cut.line, null);
+  assert.equal(cut.decided, false);
+});
+
 check('formatToPar renders E, minus and plus', () => {
   assert.equal(formatToPar(0), 'E');
   assert.equal(formatToPar(-9), '-9');

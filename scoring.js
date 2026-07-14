@@ -1,6 +1,6 @@
 // Inherit the version we were loaded at (see index.html) so config.js can't be
 // served from a different cache generation than this file.
-const { EVENT, GOLFERS, ENTRIES } = await import(
+const { EVENT, GOLFERS, ENTRIES, CUT_SIZE } = await import(
   `./config.js${new URL(import.meta.url).search}`
 );
 
@@ -89,6 +89,37 @@ function applyDemoIdentities(event) {
     slot.id = GOLFERS[key].id;
     slot.athlete = { ...(slot.athlete || {}), displayName: GOLFERS[key].name };
   });
+}
+
+// Where the cut currently sits.
+//
+// Rounds 1-2: a projection. Sort the field on their running total and read off
+// the score of the player in CUT_SIZE-th place; everyone level with them is
+// inside too ("and ties"). This number moves all through Friday.
+//
+// Round 3+: the cut has happened, so it's a fact, not a guess. Anyone with a
+// third-round score survived it, and the line is the worst 36-hole total among
+// them.
+function computeCut(field, roundsStarted) {
+  if (roundsStarted === 0) return { line: null, decided: false };
+
+  if (roundsStarted >= 3) {
+    const survivors = field.filter((p) => p.rounds[3] != null);
+    if (survivors.length === 0) return { line: null, decided: true };
+    const line = Math.max(
+      ...survivors.map((p) => (p.rounds[1] ?? 0) + (p.rounds[2] ?? 0)),
+    );
+    return { line, decided: true };
+  }
+
+  const totals = field
+    .map((p) => p.total)
+    .filter((t) => t != null)
+    .sort((a, b) => a - b);
+  if (totals.length === 0) return { line: null, decided: false };
+
+  const line = totals[Math.min(CUT_SIZE - 1, totals.length - 1)];
+  return { line, decided: false };
 }
 
 // The worst score anyone in the field posted in a given round. This is the
@@ -234,5 +265,60 @@ export function computeStandings(board) {
       : a.delta - b.delta || a.manager.localeCompare(b.manager),
   );
 
-  return { rows, roundsStarted, penalties, winningScore, leaders, predictions };
+  // Every golfer the league drafted, with their real live score (no penalty
+  // applied — this view is about the golfer, not the fantasy maths) and where
+  // they stand against the cut.
+  const cut = computeCut(field, roundsStarted);
+
+  const owners = new Map();
+  for (const entry of ENTRIES) {
+    for (const key of entry.picks) {
+      if (!owners.has(key)) owners.set(key, []);
+      owners.get(key).push(entry.manager);
+    }
+  }
+
+  const golferBoard = Object.entries(GOLFERS)
+    .map(([key, meta]) => {
+      const player = byId.get(meta.id);
+      const total = player?.total ?? null;
+
+      // After the cut, survival is a fact: you have a third round or you don't.
+      // Before it, it's a projection against a moving line.
+      const survived = player ? player.rounds[3] != null : false;
+      const madeCut = cut.decided ? survived : null;
+      const projectedIn =
+        cut.decided || cut.line == null || total == null ? null : total <= cut.line;
+
+      return {
+        ...meta,
+        key,
+        owners: owners.get(key) ?? [],
+        found: !!player,
+        total,
+        rounds: player?.rounds ?? {},
+        roundsPlayed: player?.roundsPlayed ?? 0,
+        madeCut,
+        projectedIn,
+        // Strokes inside (negative) or outside (positive) the line.
+        toCut: total != null && cut.line != null ? total - cut.line : null,
+        inside: cut.decided ? survived : projectedIn,
+      };
+    })
+    .sort((a, b) => {
+      if (a.total == null) return 1;
+      if (b.total == null) return -1;
+      return a.total - b.total || a.name.localeCompare(b.name);
+    });
+
+  return {
+    rows,
+    roundsStarted,
+    penalties,
+    winningScore,
+    leaders,
+    predictions,
+    cut,
+    golferBoard,
+  };
 }

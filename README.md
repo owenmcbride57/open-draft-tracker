@@ -30,6 +30,32 @@ The dashboard does not paper over this. When it happens the affected managers ge
 a red **"dead heat — league must settle"** badge instead of a silently invented
 order. The league has agreed to settle any such tie after the fact.
 
+## The three tabs
+
+The view is stored in the URL hash, so links are shareable and the browser's back
+button moves between tabs.
+
+- **Draft order** (`#draft`) — the home tab. Who picks when.
+- **Score tracker** (`#tracker`) — every predicted winning score plotted against
+  the live leader, ranked by who's closest.
+- **Golfers & cut** (`#golfers`) — all eleven drafted golfers with their real
+  live scores, split by the cut line: above it you survive, below it you're going
+  home.
+
+### How the cut line is worked out
+
+The Open cuts to the **top 70 and ties** after 36 holes, so the line is not a
+fixed number:
+
+- **Rounds 1–2** it's a *projection*. We sort the field on their running totals
+  and read off the 70th score; anyone level with it is inside too. This number
+  moves all through Friday.
+- **Round 3 onward** it's a *fact*. Anyone with a third-round score survived, and
+  the line is the worst 36-hole total among them.
+
+This view shows each golfer's **real** score, not their penalised fantasy score —
+it's about the golfer, not the maths. The penalty only appears on the draft board.
+
 ## How live is it?
 
 ESPN serves this feed with `cache-control: max-age=1` — it is not cached, so

@@ -11,7 +11,7 @@
       alongside a stale scoring.js and the board breaks. Bump this number (in
       BOTH places below) on every deploy that changes JS or CSS.
     -->
-    <link rel="stylesheet" href="./styles.css?v=3" />
+    <link rel="stylesheet" href="./styles.css?v=4" />
   </head>
   <body>
     <header class="masthead">
@@ -28,37 +28,58 @@
           </div>
         </div>
       </div>
-      <div class="rules-bar">
-        <span><strong>Lowest</strong> combined score of 3 golfers picks first</span>
-        <span class="dot">·</span>
-        <span>Missed cut = <strong>field's worst round</strong> for each round not played</span>
-        <span class="dot">·</span>
-        <span>Ties broken by <strong>predicted winning score</strong></span>
-      </div>
+      <nav class="tabs" role="tablist">
+        <button class="tab" role="tab" data-tab="draft">Draft order</button>
+        <button class="tab" role="tab" data-tab="tracker">Score tracker</button>
+        <button class="tab" role="tab" data-tab="golfers">Golfers &amp; cut</button>
+      </nav>
     </header>
 
     <main>
       <div id="error" class="error" hidden></div>
 
-      <section class="leader-panel">
-        <div class="leader-head">
-          <div class="leader-now">
-            <p class="panel-label">Current leader</p>
-            <p id="leader-score" class="leader-score">—</p>
-            <p id="leader-names" class="leader-names">Not started</p>
-          </div>
-          <div class="leader-closest">
-            <p class="panel-label">Closest prediction</p>
-            <p id="closest" class="closest">—</p>
-          </div>
-        </div>
-
-        <div class="track" id="track"></div>
-
-        <ul id="pred-list" class="pred-list"></ul>
+      <!-- Draft order -->
+      <section class="panel-view" data-view="draft">
+        <p class="view-note">
+          <strong>Lowest</strong> combined score of 3 golfers picks first. Missed cut =
+          <strong>field's worst round</strong> for each round not played. Ties broken by
+          <strong>predicted winning score</strong>.
+        </p>
+        <ol id="board" class="board"></ol>
       </section>
 
-      <ol id="board" class="board"></ol>
+      <!-- Predicted winning score vs the live leader -->
+      <section class="panel-view" data-view="tracker" hidden>
+        <section class="leader-panel">
+          <div class="leader-head">
+            <div class="leader-now">
+              <p class="panel-label">Current leader</p>
+              <p id="leader-score" class="leader-score">—</p>
+              <p id="leader-names" class="leader-names">Not started</p>
+            </div>
+            <div class="leader-closest">
+              <p class="panel-label">Closest prediction</p>
+              <p id="closest" class="closest">—</p>
+            </div>
+          </div>
+
+          <div class="track" id="track"></div>
+
+          <ul id="pred-list" class="pred-list"></ul>
+        </section>
+      </section>
+
+      <!-- Drafted golfers against the cut line -->
+      <section class="panel-view" data-view="golfers" hidden>
+        <div class="cut-head">
+          <div>
+            <p class="panel-label">Cut line</p>
+            <p id="cut-line" class="cut-line-score">—</p>
+          </div>
+          <p id="cut-note" class="cut-note"></p>
+        </div>
+        <ul id="golfer-board" class="golfer-board"></ul>
+      </section>
     </main>
 
     <footer>
@@ -68,6 +89,6 @@
       </p>
     </footer>
 
-    <script type="module" src="./app.js?v=3"></script>
+    <script type="module" src="./app.js?v=4"></script>
   </body>
 </html>

@@ -43,3 +43,7 @@ export const ENTRIES = [
 
 // How often to re-pull the leaderboard, in seconds.
 export const REFRESH_SECONDS = 60;
+
+// The Open cuts to the top 70 and ties after 36 holes. The line therefore moves
+// all through Friday as the field posts scores — it is not a fixed number.
+export const CUT_SIZE = 70;
