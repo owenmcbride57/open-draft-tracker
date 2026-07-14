@@ -323,11 +323,13 @@ export function computeStandings(board) {
   // they stand against the cut.
   const cut = computeCut(field, roundsStarted);
 
+  // Owners are listed side by side against each golfer, so use the short name
+  // where one is set. Scheffler carries seven of them.
   const owners = new Map();
   for (const entry of ENTRIES) {
     for (const key of entry.picks) {
       if (!owners.has(key)) owners.set(key, []);
-      owners.get(key).push(entry.manager);
+      owners.get(key).push(entry.short ?? entry.manager);
     }
   }
 

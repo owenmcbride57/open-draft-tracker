@@ -473,6 +473,22 @@ check('every drafted golfer is listed, with the managers who picked them', () =>
   // Hovland was picked by exactly one person.
   const hovland = golferBoard.find((g) => g.id === GOLFERS.hovland.id);
   assert.deepEqual(hovland.owners, ['Coop']);
+
+  // Owners are listed side by side, so the short name is used where one is set.
+  // The draft board still shows the full name.
+  assert.ok(
+    scheffler.owners.includes('PJ'),
+    `expected the short name on the golfers tab, got ${scheffler.owners.join(', ')}`,
+  );
+  assert.ok(
+    !scheffler.owners.includes('Patrick John Kealy III'),
+    'the full name should not appear in the owners list',
+  );
+  const { rows } = computeStandings(board(field));
+  assert.ok(
+    rows.some((r) => r.manager === 'Patrick John Kealy III'),
+    'the draft board keeps the full name',
+  );
 });
 
 check('a golfer appears exactly once, even if the feed carries duplicate ids', () => {

@@ -28,6 +28,10 @@ export const GOLFERS = {
 
 // Each manager's three picks, plus their predicted winning score (to par),
 // which breaks ties.
+//
+// `short` is optional and used only where names are listed side by side (the
+// golfers tab, where a popular golfer can carry seven owners). The draft board
+// always shows the full name.
 export const ENTRIES = [
   { manager: 'Jack',                     picks: ['scheffler', 'mcilroy', 'morikawa'],      prediction: -9 },
   { manager: 'Braddy',                   picks: ['scheffler', 'fleetwood', 'fitzpatrick'], prediction: -8 },
@@ -37,7 +41,7 @@ export const ENTRIES = [
   { manager: 'Harry',                    picks: ['mcilroy', 'rahm', 'dechambeau'],         prediction: -5 },
   { manager: 'Sweeney',                  picks: ['mcilroy', 'scheffler', 'fitzpatrick'],   prediction: -11 },
   { manager: 'AJ',                       picks: ['scheffler', 'morikawa', 'fleetwood'],    prediction: -16 },
-  { manager: 'Patrick John Kealy III',   picks: ['scheffler', 'fitzpatrick', 'fleetwood'], prediction: -9 },
+  { manager: 'Patrick John Kealy III',   short: 'PJ', picks: ['scheffler', 'fitzpatrick', 'fleetwood'], prediction: -9 },
   { manager: 'Coop',                     picks: ['scheffler', 'fitzpatrick', 'hovland'],   prediction: -15 },
 ];
 
