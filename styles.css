@@ -357,13 +357,27 @@ main {
 
 .cut-line-score.is-live { color: var(--text); }
 
-.cut-note {
-  margin: 0;
+.cut-stat { min-width: 0; }
+.cut-head .cut-stat:last-child { text-align: right; }
+
+.cut-sub {
+  margin: 0.15rem 0 0;
   font-size: 0.78rem;
   color: var(--muted);
-  text-align: right;
-  max-width: 22rem;
+  max-width: 24rem;
 }
+
+.cut-sub .ours { color: var(--green); font-weight: 600; }
+.cut-sub .not-ours { color: var(--muted); font-style: italic; }
+
+.badge.lead {
+  background: var(--gold);
+  color: #0b1410;
+  font-weight: 700;
+}
+
+.golfer-row.is-leader { border-color: var(--gold); }
+.golfer-row.is-leader .g-name { display: flex; align-items: center; gap: 0.45rem; }
 
 .golfer-board {
   list-style: none;
@@ -646,7 +660,8 @@ footer p { margin: 0; }
   .tabs { overflow-x: auto; }
   .tab { padding: 0.6rem 0.6rem; }
 
-  .cut-note { text-align: left; }
+  .cut-head { gap: 1.25rem; }
+  .cut-head .cut-stat:last-child { text-align: left; }
 
   .golfer-row {
     grid-template-columns: minmax(0, 1fr) 3.25rem;

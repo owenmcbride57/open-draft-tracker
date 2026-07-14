@@ -11,7 +11,7 @@
       alongside a stale scoring.js and the board breaks. Bump this number (in
       BOTH places below) on every deploy that changes JS or CSS.
     -->
-    <link rel="stylesheet" href="./styles.css?v=4" />
+    <link rel="stylesheet" href="./styles.css?v=5" />
   </head>
   <body>
     <header class="masthead">
@@ -72,11 +72,16 @@
       <!-- Drafted golfers against the cut line -->
       <section class="panel-view" data-view="golfers" hidden>
         <div class="cut-head">
-          <div>
+          <div class="cut-stat">
+            <p class="panel-label">Tournament leader</p>
+            <p id="g-leader-score" class="cut-line-score">—</p>
+            <p id="g-leader-names" class="cut-sub">Not started</p>
+          </div>
+          <div class="cut-stat">
             <p class="panel-label">Cut line</p>
             <p id="cut-line" class="cut-line-score">—</p>
+            <p id="cut-note" class="cut-sub"></p>
           </div>
-          <p id="cut-note" class="cut-note"></p>
         </div>
         <ul id="golfer-board" class="golfer-board"></ul>
       </section>
@@ -89,6 +94,6 @@
       </p>
     </footer>
 
-    <script type="module" src="./app.js?v=4"></script>
+    <script type="module" src="./app.js?v=5"></script>
   </body>
 </html>

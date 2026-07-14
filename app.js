@@ -20,6 +20,8 @@ const predListEl = document.getElementById('pred-list');
 const cutLineEl = document.getElementById('cut-line');
 const cutNoteEl = document.getElementById('cut-note');
 const golferBoardEl = document.getElementById('golfer-board');
+const gLeaderScoreEl = document.getElementById('g-leader-score');
+const gLeaderNamesEl = document.getElementById('g-leader-names');
 
 // ---------------------------------------------------------------------------
 // Tabs. Driven off the URL hash so a link to a specific view survives a reload
@@ -227,8 +229,28 @@ function renderLeaderPanel({ winningScore, leaders = [], predictions = [] }) {
 
 // Every drafted golfer, ranked, with the cut line drawn straight through the
 // list — above it you're surviving, below it you're going home.
-function renderGolferBoard({ cut, golferBoard, roundsStarted }) {
+function renderGolferBoard({ cut, golferBoard, roundsStarted, winningScore, leaders = [] }) {
   if (!cutLineEl || !cutNoteEl || !golferBoardEl) return;
+
+  // The tournament leader, for context: the cut line alone doesn't tell you what
+  // a good score looks like in the day's conditions.
+  if (gLeaderScoreEl && gLeaderNamesEl) {
+    const live = winningScore != null;
+    gLeaderScoreEl.textContent = live ? formatToPar(winningScore) : '—';
+    gLeaderScoreEl.classList.toggle('is-live', live);
+
+    if (!live) {
+      gLeaderNamesEl.textContent = 'Not started';
+    } else {
+      const drafted = golferBoard.filter((g) => leaders.includes(g.name));
+      const who =
+        leaders.length <= 2 ? leaders.join(' & ') : `${leaders[0]} +${leaders.length - 1} more`;
+      // The leader is usually someone nobody in the league picked — worth saying.
+      gLeaderNamesEl.innerHTML = drafted.length
+        ? `${who} <span class="ours">drafted by ${[...new Set(drafted.flatMap((g) => g.owners))].join(', ')}</span>`
+        : `${who} <span class="not-ours">nobody picked them</span>`;
+    }
+  }
 
   cutLineEl.textContent = cut.line == null ? '—' : formatToPar(cut.line);
   cutLineEl.classList.toggle('is-live', cut.line != null);
@@ -277,8 +299,10 @@ function renderGolferBoard({ cut, golferBoard, roundsStarted }) {
     // rather than greying the whole field out as if they'd all missed.
     const standing = cut.line == null ? 'neutral' : g.inside ? 'inside' : 'outside';
 
-    return `<li class="golfer-row ${standing}">
-      <span class="g-name">${g.name}</span>
+    const crown = leaders.includes(g.name) ? '<span class="badge lead">LEADER</span>' : '';
+
+    return `<li class="golfer-row ${standing}${crown ? ' is-leader' : ''}">
+      <span class="g-name">${g.name}${crown}</span>
       <span class="g-owners">${g.owners.join(', ')}</span>
       <span class="g-rounds">${rounds(g)}</span>
       ${margin}

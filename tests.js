@@ -370,6 +370,31 @@ check('every drafted golfer is listed, with the managers who picked them', () =>
   assert.deepEqual(hovland.owners, ['Coop']);
 });
 
+check('a golfer appears exactly once, even if the feed carries duplicate ids', () => {
+  // Guards the demo-mode bug: the replayed event's real field also contains our
+  // golfers, so a careless graft produced two competitors sharing one athlete id
+  // and the views disagreed about the same person.
+  const field = [
+    player('Scottie Scheffler', [-4, -4, -4, -5], GOLFERS.scheffler.id), // -17
+    ...Object.values(GOLFERS)
+      .filter((g) => g.key !== 'scheffler' && g.id !== GOLFERS.scheffler.id)
+      .map((g) => player(g.name, [0, 0, 0, 0], g.id)),
+  ];
+  const { golferBoard, leaders, winningScore } = computeStandings(board(field));
+
+  const ids = golferBoard.map((g) => g.id);
+  assert.equal(new Set(ids).size, ids.length, 'no golfer listed twice');
+
+  const scheffler = golferBoard.filter((g) => g.id === GOLFERS.scheffler.id);
+  assert.equal(scheffler.length, 1, 'exactly one Scheffler row');
+
+  // The leader panel and the golfer board must agree about the same player.
+  assert.equal(winningScore, -17);
+  assert.deepEqual(leaders, ['Scottie Scheffler']);
+  assert.equal(scheffler[0].total, -17, 'the golfer board shows the same score');
+  assert.equal(scheffler[0].inside, true, 'the leader cannot also have missed the cut');
+});
+
 check('no cut line before anyone has teed off', () => {
   const field = Object.values(GOLFERS).map((g) => player(g.name, [], g.id));
   const { cut } = computeStandings(board(field, { started: false }));

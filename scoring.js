@@ -74,6 +74,17 @@ export async function fetchLeaderboard({ demo = false } = {}) {
 // visible on the board. Demo only — never touches the live path.
 function applyDemoIdentities(event) {
   const competitors = event.competitions?.[0]?.competitors || [];
+
+  // The replayed event has a real field, and several of our golfers actually
+  // played in it. Grafting our ids on top would create duplicate athlete ids —
+  // the lookup map would keep whichever came last, and the leader panel could
+  // then disagree with the golfer board about the same person. Retire the real
+  // entries first so every id in the demo field is unique.
+  const ourIds = new Set(Object.values(GOLFERS).map((g) => g.id));
+  for (const c of competitors) {
+    if (ourIds.has(c.id)) c.id = `real-${c.id}`;
+  }
+
   const madeCut = competitors.filter((c) => (c.linescores || []).length === 4);
   const missedCut = competitors.filter((c) => (c.linescores || []).length === 2);
 
