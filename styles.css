@@ -1,0 +1,328 @@
+:root {
+  --bg: #0b1410;
+  --panel: #10201a;
+  --panel-2: #162b22;
+  --line: #234436;
+  --text: #eaf3ee;
+  --muted: #8fae9f;
+  --gold: #d8b46a;
+  --green: #4ade80;
+  --red: #f87171;
+  --warn: #eab308;
+  --radius: 12px;
+  --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background:
+    radial-gradient(1200px 600px at 50% -10%, #1a3529 0%, transparent 60%),
+    var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, system-ui, sans-serif;
+  min-height: 100vh;
+  padding-bottom: 3rem;
+}
+
+/* ---------- masthead ---------- */
+
+.masthead {
+  border-bottom: 1px solid var(--line);
+  padding: 1.75rem 1.25rem 0;
+}
+
+.masthead-inner {
+  max-width: 960px;
+  margin: 0 auto;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.eyebrow {
+  margin: 0 0 0.3rem;
+  font-size: 0.72rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--gold);
+  font-weight: 600;
+}
+
+h1 {
+  margin: 0;
+  font-size: 2rem;
+  letter-spacing: -0.02em;
+  font-weight: 700;
+}
+
+h1 span { color: var(--muted); font-weight: 400; }
+
+.status-block { text-align: right; }
+
+.status-line {
+  margin: 0;
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+.refresh-line {
+  margin: 0.15rem 0 0;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.rules-bar {
+  max-width: 960px;
+  margin: 1.25rem auto 0;
+  padding: 0.7rem 0;
+  font-size: 0.8rem;
+  color: var(--muted);
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.rules-bar strong { color: var(--text); font-weight: 600; }
+.rules-bar .dot { color: var(--line); }
+
+/* ---------- board ---------- */
+
+main {
+  max-width: 960px;
+  margin: 1.5rem auto 0;
+  padding: 0 1.25rem;
+}
+
+.error {
+  background: #3a1a1a;
+  border: 1px solid #6b2b2b;
+  color: #fecaca;
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius);
+  margin-bottom: 1rem;
+  font-size: 0.9rem;
+}
+
+.board {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.entry {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+  transition: border-color 0.15s ease;
+}
+
+.entry:hover { border-color: #2f5b49; }
+
+.entry-head {
+  width: 100%;
+  background: none;
+  border: 0;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  padding: 0.85rem 1rem;
+  display: grid;
+  grid-template-columns: 3.25rem minmax(0, 1fr) auto 3.5rem 4.25rem;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.pick {
+  font-family: var(--mono);
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--gold);
+}
+
+.manager { min-width: 0; }
+
+.manager-name {
+  display: block;
+  font-weight: 600;
+  font-size: 1rem;
+}
+
+.picks-preview {
+  display: block;
+  font-size: 0.78rem;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.chips { display: flex; gap: 0.35rem; flex-wrap: wrap; justify-content: flex-end; }
+
+.chip {
+  font-size: 0.68rem;
+  padding: 0.2rem 0.45rem;
+  border-radius: 999px;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.chip.warn {
+  color: var(--warn);
+  border-color: #5c4a12;
+  background: #241f0c;
+}
+
+.chip.danger {
+  color: #fca5a5;
+  border-color: #6b2b2b;
+  background: #2a1414;
+}
+
+.entry.unresolved { border-color: #6b2b2b; }
+
+/* Demo mode must never be mistaken for real scores. */
+body.demo .refresh-line {
+  color: #0b1410;
+  background: var(--gold);
+  font-weight: 700;
+  padding: 0.1rem 0.4rem;
+  border-radius: 4px;
+  display: inline-block;
+}
+
+.prediction {
+  font-family: var(--mono);
+  font-size: 0.85rem;
+  color: var(--muted);
+  text-align: right;
+}
+
+.total {
+  font-family: var(--mono);
+  font-size: 1.35rem;
+  font-weight: 700;
+  text-align: right;
+}
+
+/* ---------- expanded golfers ---------- */
+
+.golfers {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: none;
+  border-top: 1px solid var(--line);
+  background: #0d1a15;
+}
+
+.entry.open .golfers { display: block; }
+
+.golfer {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto 3.5rem;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.6rem 1rem;
+  border-bottom: 1px solid #16261f;
+  font-size: 0.9rem;
+}
+
+.golfer:last-child { border-bottom: 0; }
+
+.golfer-name { display: flex; align-items: center; gap: 0.45rem; }
+
+.golfer.is-cut .golfer-name { color: var(--muted); }
+
+.badge {
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  padding: 0.1rem 0.3rem;
+  border-radius: 4px;
+}
+
+.badge.cut { background: #4a2020; color: #fca5a5; }
+
+.rounds { display: flex; gap: 0.3rem; }
+
+.round {
+  font-family: var(--mono);
+  font-size: 0.74rem;
+  width: 2.35rem;
+  text-align: center;
+  padding: 0.2rem 0;
+  border-radius: 5px;
+  background: var(--panel-2);
+  color: var(--text);
+}
+
+.round.pending { color: #3c5c4d; background: transparent; }
+
+.round.penalty {
+  background: #3a2a0a;
+  color: var(--warn);
+  border: 1px dashed #6b5416;
+}
+
+.golfer-total {
+  font-family: var(--mono);
+  font-weight: 600;
+  text-align: right;
+}
+
+.golfer-note { font-size: 0.78rem; color: var(--red); }
+
+/* ---------- footer ---------- */
+
+footer {
+  max-width: 960px;
+  margin: 2rem auto 0;
+  padding: 0 1.25rem;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+footer p { margin: 0; }
+
+/* ---------- mobile ---------- */
+
+@media (max-width: 640px) {
+  h1 { font-size: 1.5rem; }
+  .masthead-inner { align-items: flex-start; }
+  .status-block { text-align: left; }
+
+  .entry-head {
+    grid-template-columns: 2.5rem minmax(0, 1fr) 3.75rem;
+    grid-template-areas:
+      "pick manager total"
+      ".    chips   chips";
+    row-gap: 0.4rem;
+  }
+  .pick { grid-area: pick; }
+  .manager { grid-area: manager; }
+  .total { grid-area: total; }
+  .chips { grid-area: chips; justify-content: flex-start; }
+  .prediction { display: none; }
+
+  .golfer {
+    grid-template-columns: minmax(0, 1fr) 3rem;
+    grid-template-areas:
+      "name  total"
+      "rounds rounds";
+    row-gap: 0.4rem;
+  }
+  .golfer-name { grid-area: name; }
+  .golfer-total { grid-area: total; }
+  .rounds { grid-area: rounds; }
+}

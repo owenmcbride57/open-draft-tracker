@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Draft Order — The Open 2026</title>
+    <link rel="preconnect" href="https://site.api.espn.com" />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <header class="masthead">
+      <div class="masthead-inner">
+        <div class="title-block">
+          <p class="eyebrow">Fantasy Football Draft Order</p>
+          <h1>The Open <span>2026</span></h1>
+        </div>
+        <div class="status-block">
+          <p id="status-line" class="status-line">Loading leaderboard…</p>
+          <p id="refresh-line" class="refresh-line"></p>
+        </div>
+      </div>
+      <div class="rules-bar">
+        <span><strong>Lowest</strong> combined score of 3 golfers picks first</span>
+        <span class="dot">·</span>
+        <span>Missed cut = <strong>field's worst round</strong> for each round not played</span>
+        <span class="dot">·</span>
+        <span>Ties broken by <strong>predicted winning score</strong></span>
+      </div>
+    </header>
+
+    <main>
+      <div id="error" class="error" hidden></div>
+      <ol id="board" class="board"></ol>
+    </main>
+
+    <footer>
+      <p>
+        Live scores from ESPN. Standings recompute automatically every 60 seconds.
+        <span id="leader-note"></span>
+      </p>
+    </footer>
+
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>

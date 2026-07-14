@@ -1,0 +1,11 @@
+{
+  "name": "open-draft-tracker",
+  "version": "1.0.0",
+  "description": "Live draft-order tracker for The Open 2026 fantasy football pool",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "test": "node test.mjs",
+    "dev": "python3 -m http.server 4173"
+  }
+}

@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Scoring tests — Open Draft Tracker</title>
+    <style>
+      body {
+        background: #0b1410;
+        color: #eaf3ee;
+        font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+        font-size: 13px;
+        line-height: 1.7;
+        padding: 2rem;
+      }
+      h1 { font-size: 1rem; margin: 0 0 1rem; }
+      #summary { font-weight: 700; padding: 0.6rem 0.9rem; border-radius: 8px; display: inline-block; margin-bottom: 1.25rem; }
+      #summary.ok { background: #123a24; color: #4ade80; }
+      #summary.bad { background: #3a1a1a; color: #f87171; }
+      #out div { white-space: pre-wrap; }
+      .group { margin-top: 1rem; color: #d8b46a; font-weight: 700; }
+      .pass { color: #7fd1a3; }
+      .fail { color: #f87171; }
+      .note { color: #8fae9f; }
+    </style>
+  </head>
+  <body>
+    <h1>Scoring tests</h1>
+    <div id="summary">running…</div>
+    <div id="out"></div>
+    <script type="module" src="./tests.js"></script>
+  </body>
+</html>
