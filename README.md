@@ -33,16 +33,23 @@ end-of-day batch job is needed: it converges by itself.
 - **Ties** are broken by whose **predicted winning score** is closest to the
   actual winning score.
 
-### One thing the rules don't cover
+### Dead heats are deliberately left unresolved
 
 The tiebreaker can itself tie. Jack and Patrick John Kealy III both predicted −9,
 so if they ever finish level on combined score, nothing separates them. Two
 predictions can also sit an equal distance either side of the winning score — if
 the winner finishes at −10, then −9 and −11 are both exactly one stroke off.
 
-The dashboard does not paper over this. When it happens the affected managers get
-a red **"dead heat — league must settle"** badge instead of a silently invented
-order. The league has agreed to settle any such tie after the fact.
+**This is a known gap and the league has chosen to leave it open.** A second
+tiebreaker will be agreed before the draft in August, if it turns out to be
+needed at all.
+
+So the dashboard must not paper over it. When a dead heat occurs the affected
+managers get a red **"dead heat — league must settle"** badge, and the ordering
+between them is arbitrary and meaningless. Do **not** "fix" this by adding a
+silent fallback (alphabetical, entry order, closest-without-going-over, or
+anything else) — inventing an order would hide the very situation the league
+needs to be told about. `tests.js` pins this behaviour under "unresolved ties".
 
 ## The three tabs
 
