@@ -33,6 +33,25 @@
 
     <main>
       <div id="error" class="error" hidden></div>
+
+      <section class="leader-panel">
+        <div class="leader-head">
+          <div class="leader-now">
+            <p class="panel-label">Current leader</p>
+            <p id="leader-score" class="leader-score">—</p>
+            <p id="leader-names" class="leader-names">Not started</p>
+          </div>
+          <div class="leader-closest">
+            <p class="panel-label">Closest prediction</p>
+            <p id="closest" class="closest">—</p>
+          </div>
+        </div>
+
+        <div class="track" id="track"></div>
+
+        <ul id="pred-list" class="pred-list"></ul>
+      </section>
+
       <ol id="board" class="board"></ol>
     </main>
 

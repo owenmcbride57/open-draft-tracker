@@ -7,6 +7,11 @@ const refreshEl = document.getElementById('refresh-line');
 const errorEl = document.getElementById('error');
 const leaderNoteEl = document.getElementById('leader-note');
 const refreshBtn = document.getElementById('refresh');
+const leaderScoreEl = document.getElementById('leader-score');
+const leaderNamesEl = document.getElementById('leader-names');
+const closestEl = document.getElementById('closest');
+const trackEl = document.getElementById('track');
+const predListEl = document.getElementById('pred-list');
 
 const ORDINALS = ['1st', '2nd', '3rd', '4th', '5th', '6th', '7th', '8th', '9th', '10th'];
 
@@ -86,8 +91,103 @@ function entryCard(row, roundsStarted, live) {
   </li>`;
 }
 
+// Plot every prediction on a shared scale with the live leader marked. Lower
+// (better) scores sit to the left, the way a golf leaderboard reads.
+function renderLeaderPanel({ winningScore, leaders, predictions }) {
+  const live = winningScore != null;
+
+  leaderScoreEl.textContent = live ? formatToPar(winningScore) : '—';
+  leaderScoreEl.classList.toggle('is-live', live);
+
+  if (!live) {
+    leaderNamesEl.textContent = 'No scores yet';
+    closestEl.textContent = '—';
+  } else {
+    // A shared lead is common, and it's usually someone nobody drafted.
+    leaderNamesEl.textContent =
+      leaders.length === 0
+        ? '—'
+        : leaders.length <= 2
+          ? leaders.join(' & ')
+          : `${leaders[0]} +${leaders.length - 1} more`;
+
+    const best = predictions[0];
+    const alsoBest = predictions.filter((p) => p.delta === best.delta);
+    closestEl.innerHTML =
+      best.delta === 0
+        ? `<strong>${alsoBest.map((p) => p.manager).join(', ')}</strong> <span class="spot-on">spot on</span>`
+        : `<strong>${alsoBest.map((p) => p.manager).join(', ')}</strong> <span class="off">${best.delta} off</span>`;
+  }
+
+  // Scale spans every prediction plus the leader, so the marker never falls off
+  // the end if someone runs away with it at -20.
+  const values = predictions.map((p) => p.prediction);
+  if (live) values.push(winningScore);
+  const lo = Math.min(...values) - 1;
+  const hi = Math.max(...values) + 1;
+  const pos = (v) => ((v - lo) / (hi - lo)) * 100;
+
+  // Several managers picked the same number, so collapse them into one dot.
+  const groups = new Map();
+  for (const p of predictions) {
+    if (!groups.has(p.prediction)) groups.set(p.prediction, []);
+    groups.get(p.prediction).push(p.manager);
+  }
+
+  const dots = [...groups.entries()]
+    .map(
+      ([value, managers]) => `
+      <span class="dot${managers.length > 1 ? ' multi' : ''}"
+            style="left:${pos(value)}%"
+            title="${managers.join(', ')} — predicted ${formatToPar(value)}">
+        <span class="dot-label">${formatToPar(value)}</span>
+      </span>`,
+    )
+    .join('');
+
+  const marker = live
+    ? `<span class="leader-marker" style="left:${pos(winningScore)}%">
+         <span class="leader-marker-label">${formatToPar(winningScore)}</span>
+       </span>`
+    : '';
+
+  trackEl.innerHTML = `
+    <span class="track-line"></span>
+    ${marker}
+    ${dots}
+    <span class="track-end left">${formatToPar(lo)}</span>
+    <span class="track-end right">${formatToPar(hi)}</span>`;
+
+  predListEl.innerHTML = predictions
+    .map((p) => {
+      const delta =
+        p.delta == null
+          ? ''
+          : p.delta === 0
+            ? '<span class="delta spot-on">spot on</span>'
+            : `<span class="delta">${p.delta} off</span>`;
+      // Tell people which way they're wrong — it's the thing they actually want
+      // to know once the leader passes their number.
+      const dir =
+        !live || p.delta === 0
+          ? ''
+          : p.direction === 'under'
+            ? '<span class="dir">leader is past it</span>'
+            : '<span class="dir">leader not there yet</span>';
+      return `<li>
+        <span class="pred-manager">${p.manager}</span>
+        <span class="pred-value">${formatToPar(p.prediction)}</span>
+        ${delta}
+        ${dir}
+      </li>`;
+    })
+    .join('');
+}
+
 function render(board, standings) {
   const { rows, roundsStarted, penalties, winningScore } = standings;
+
+  renderLeaderPanel(standings);
 
   // A pick number only means something once someone has actually posted a score.
   const live = roundsStarted > 0;

@@ -233,6 +233,60 @@ check('a manager whose prediction is unique among the tied group is resolved cle
   assert.equal(ferrel.unresolved, false, '...but the prediction settled it outright');
 });
 
+group('current leader tracker');
+
+check('reports the leader, and every manager who shares the lead', () => {
+  const field = [
+    ...Object.values(GOLFERS).map((g) => player(g.name, [0, 0, 0, 0], g.id)),
+    player('Leader One', [-3, -3, -3, -3], 'w1'), // -12
+    player('Leader Two', [-6, -2, -2, -2], 'w2'), // -12, co-leader
+    player('Chasing', [-2, -2, -2, -2], 'w3'), // -8
+  ];
+  const { winningScore, leaders } = computeStandings(board(field));
+  assert.equal(winningScore, -12);
+  assert.deepEqual(leaders.sort(), ['Leader One', 'Leader Two'], 'a shared lead lists both');
+});
+
+check('predictions are ranked by distance from the leader, closest first', () => {
+  const field = [
+    ...Object.values(GOLFERS).map((g) => player(g.name, [0, 0, 0, 0], g.id)),
+    player('Some Winner', [-3, -3, -3, -3], 'w1'), // -12
+  ];
+  const { predictions } = computeStandings(board(field));
+
+  assert.equal(predictions[0].manager, 'Goon', 'predicted -12, exactly right');
+  assert.equal(predictions[0].delta, 0);
+  assert.equal(predictions[0].direction, 'exact');
+
+  // Deltas must be non-decreasing down the list.
+  for (let i = 1; i < predictions.length; i++) {
+    assert.ok(predictions[i].delta >= predictions[i - 1].delta, 'must be sorted by delta');
+  }
+
+  // Harry called -5; the leader at -12 has blown past it.
+  const harry = predictions.find((p) => p.manager === 'Harry');
+  assert.equal(harry.delta, 7);
+  assert.equal(harry.direction, 'under', 'leader is better than Harry predicted');
+
+  // AJ called -16; the leader has not got there yet.
+  const aj = predictions.find((p) => p.manager === 'AJ');
+  assert.equal(aj.delta, 4);
+  assert.equal(aj.direction, 'over', 'leader has not reached AJ’s number');
+});
+
+check('before the tournament starts there is no leader and no closest prediction', () => {
+  const field = Object.values(GOLFERS).map((g) => player(g.name, [], g.id));
+  const { winningScore, leaders, predictions } = computeStandings(
+    board(field, { started: false }),
+  );
+  assert.equal(winningScore, null, 'no leader before a ball is struck');
+  assert.deepEqual(leaders, []);
+  assert.ok(predictions.every((p) => p.delta === null), 'no deltas without a leader');
+  // Falls back to ordering by the call itself: boldest (-16) first.
+  assert.equal(predictions[0].manager, 'AJ');
+  assert.equal(predictions[predictions.length - 1].manager, 'Harry');
+});
+
 check('formatToPar renders E, minus and plus', () => {
   assert.equal(formatToPar(0), 'E');
   assert.equal(formatToPar(-9), '-9');

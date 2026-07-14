@@ -201,5 +201,34 @@ export function computeStandings(board) {
     row.unresolvedWith = stillTied.map((r) => r.manager);
   });
 
-  return { rows, roundsStarted, penalties, winningScore };
+  // Who is actually leading — there is often more than one, and at The Open the
+  // leader is frequently someone nobody in the league picked.
+  const leaders =
+    winningScore == null
+      ? []
+      : field.filter((p) => p.total === winningScore).map((p) => p.name);
+
+  // Everyone's prediction measured against the live leader, closest first. This
+  // is the tiebreaker in flight: it only settles the draft if managers finish
+  // level on combined score, but it's the number the league will be watching.
+  const predictions = ENTRIES.map((e) => ({
+    manager: e.manager,
+    prediction: e.prediction,
+    delta: winningScore == null ? null : Math.abs(e.prediction - winningScore),
+    // Is the leader currently better (lower) than they predicted?
+    direction:
+      winningScore == null || e.prediction === winningScore
+        ? 'exact'
+        : winningScore < e.prediction
+          ? 'under' // leader is beating the prediction
+          : 'over', // leader hasn't reached the prediction yet
+  })).sort((a, b) =>
+    // Once there's a leader, closest prediction first. Before that there is no
+    // "closest", so order by the call itself — boldest to most conservative.
+    winningScore == null
+      ? a.prediction - b.prediction || a.manager.localeCompare(b.manager)
+      : a.delta - b.delta || a.manager.localeCompare(b.manager),
+  );
+
+  return { rows, roundsStarted, penalties, winningScore, leaders, predictions };
 }
