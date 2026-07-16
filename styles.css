@@ -469,6 +469,162 @@ main {
 .golfer-row.missing { grid-template-columns: 1fr auto; opacity: 0.6; }
 .g-note { font-size: 0.78rem; color: var(--red); }
 
+/* ---------- live scorecards ---------- */
+
+.legend {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-left: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.key {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  display: inline-block;
+  margin-left: 0.5rem;
+  vertical-align: -1px;
+}
+
+.key.eagle { background: #f0abfc; }
+.key.birdie { background: var(--green); }
+.key.par { background: var(--panel-2); border: 1px solid var(--line); }
+.key.bogey { background: #f0a; background: var(--warn); }
+.key.double { background: var(--red); }
+
+.scorecards {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.scorecard {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 0.8rem 1rem;
+}
+
+.scorecard.cut, .scorecard.idle, .scorecard.missing { opacity: 0.72; }
+
+.sc-head {
+  display: grid;
+  grid-template-columns: 3rem minmax(8rem, 1fr) minmax(0, 1fr) auto auto 3.5rem;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.scorecard.idle .sc-head,
+.scorecard.missing .sc-head { grid-template-columns: minmax(8rem,1fr) minmax(0,1fr) auto; }
+
+.sc-pos {
+  font-family: var(--mono);
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--gold);
+}
+
+.sc-pos.cut { color: var(--red); font-size: 0.8rem; }
+
+.sc-name { font-weight: 600; font-size: 0.95rem; }
+
+.sc-owners {
+  font-size: 0.75rem;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+.sc-today {
+  font-family: var(--mono);
+  font-size: 0.85rem;
+  color: var(--text);
+  white-space: nowrap;
+}
+
+.sc-today em { font-style: normal; color: var(--muted); font-size: 0.7rem; }
+
+.sc-thru {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.sc-total {
+  font-family: var(--mono);
+  font-size: 1.2rem;
+  font-weight: 700;
+  text-align: right;
+}
+
+.sc-note { font-size: 0.78rem; color: var(--muted); }
+.scorecard.missing .sc-note { color: var(--red); }
+
+.sc-cutnote {
+  margin: 0.6rem 0 0;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+/* the 18-hole grid */
+.card-grid { margin-top: 0.7rem; overflow-x: auto; }
+
+.hole-nums, .holes {
+  display: grid;
+  grid-template-columns: repeat(18, minmax(1.6rem, 1fr));
+  gap: 2px;
+  min-width: 30rem;
+}
+
+.hole-num {
+  font-family: var(--mono);
+  font-size: 0.58rem;
+  color: #3c5c4d;
+  text-align: center;
+  padding-bottom: 2px;
+}
+
+.hole {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-align: center;
+  padding: 0.3rem 0;
+  border-radius: 4px;
+  background: var(--panel-2);
+  color: var(--text);
+  border: 1px solid transparent;
+}
+
+.hole.empty { color: #2f4a3d; background: transparent; border: 1px dashed #1e3a2e; }
+.hole.par { background: var(--panel-2); border-color: var(--line); }
+.hole.birdie { background: #123a24; color: var(--green); border-color: #1f5537; }
+.hole.eagle { background: #3b1145; color: #f0abfc; border-color: #6b2b7a; }
+.hole.bogey { background: #241f0c; color: var(--warn); border-color: #5c4a12; }
+.hole.double { background: #2a1414; color: #fca5a5; border-color: #6b2b2b; }
+
+.sc-round-label {
+  margin: 0.4rem 0 0;
+  font-size: 0.68rem;
+  color: var(--muted);
+  font-family: var(--mono);
+}
+
+.cards-empty {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 1.25rem;
+  color: var(--muted);
+  font-size: 0.85rem;
+  text-align: center;
+}
+
 .board {
   list-style: none;
   margin: 0;
@@ -669,8 +825,33 @@ footer p { margin: 0; }
   .pred-list { grid-template-columns: 1fr; }
   .dir { display: none; }
 
-  .tabs { overflow-x: auto; }
-  .tab { padding: 0.6rem 0.6rem; }
+  /* Four tabs no longer fit on one phone line — wrap rather than hide any. */
+  .tabs { flex-wrap: wrap; gap: 0 0.15rem; }
+  .tab { padding: 0.55rem 0.5rem; font-size: 0.8rem; }
+
+  .sc-head {
+    grid-template-columns: 2.5rem minmax(0, 1fr) 3.25rem;
+    grid-template-areas:
+      "pos  name   total"
+      ".    owners owners"
+      ".    today  thru";
+    row-gap: 0.35rem;
+  }
+  .sc-pos { grid-area: pos; }
+  .sc-name { grid-area: name; }
+  .sc-total { grid-area: total; }
+  .sc-owners { grid-area: owners; }
+  .sc-today { grid-area: today; }
+  .sc-thru { grid-area: thru; text-align: right; }
+
+  .scorecard.idle .sc-head,
+  .scorecard.missing .sc-head {
+    grid-template-columns: 1fr auto;
+    grid-template-areas: "name note" "owners owners";
+  }
+  .sc-note { grid-area: note; }
+
+  .legend { display: flex; margin: 0.5rem 0 0; }
 
   .cut-head { gap: 1.25rem; }
   .cut-head .cut-stat:last-child { text-align: left; }

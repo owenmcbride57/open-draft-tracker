@@ -11,7 +11,7 @@
       alongside a stale scoring.js and the board breaks. Bump this number (in
       BOTH places below) on every deploy that changes JS or CSS.
     -->
-    <link rel="stylesheet" href="./styles.css?v=7" />
+    <link rel="stylesheet" href="./styles.css?v=8" />
   </head>
   <body>
     <header class="masthead">
@@ -32,6 +32,7 @@
         <button class="tab" role="tab" data-tab="draft">Draft order</button>
         <button class="tab" role="tab" data-tab="tracker">Score tracker</button>
         <button class="tab" role="tab" data-tab="golfers">Golfers &amp; cut</button>
+        <button class="tab" role="tab" data-tab="cards">Scorecards</button>
       </nav>
     </header>
 
@@ -85,6 +86,21 @@
         </div>
         <ul id="golfer-board" class="golfer-board"></ul>
       </section>
+
+      <!-- Hole-by-hole live scorecards -->
+      <section class="panel-view" data-view="cards" hidden>
+        <p class="view-note">
+          Live position, round score and hole-by-hole card for every drafted golfer.
+          <span class="legend">
+            <span class="key eagle"></span> eagle
+            <span class="key birdie"></span> birdie
+            <span class="key par"></span> par
+            <span class="key bogey"></span> bogey
+            <span class="key double"></span> double+
+          </span>
+        </p>
+        <ul id="scorecards" class="scorecards"></ul>
+      </section>
     </main>
 
     <footer>
@@ -94,6 +110,6 @@
       </p>
     </footer>
 
-    <script type="module" src="./app.js?v=7"></script>
+    <script type="module" src="./app.js?v=8"></script>
   </body>
 </html>

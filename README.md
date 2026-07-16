@@ -51,7 +51,7 @@ silent fallback (alphabetical, entry order, closest-without-going-over, or
 anything else) — inventing an order would hide the very situation the league
 needs to be told about. `tests.js` pins this behaviour under "unresolved ties".
 
-## The three tabs
+## The four tabs
 
 The view is stored in the URL hash, so links are shareable and the browser's back
 button moves between tabs.
@@ -62,6 +62,40 @@ button moves between tabs.
 - **Golfers & cut** (`#golfers`) — all eleven drafted golfers with their real
   live scores, split by the cut line: above it you survive, below it you're going
   home.
+- **Scorecards** (`#cards`) — live position, today's score, holes played and a
+  hole-by-hole card for every drafted golfer.
+
+### What the Scorecards tab can and cannot show
+
+It shows live tournament position, today's round score, "thru" count, total, and
+an 18-hole grid coloured eagle / birdie / par / bogey / double+. Unplayed holes
+are drawn as empty outlines, so a card fills in as the round goes on.
+
+It does **not** show where a ball is on the hole, or which stroke a player is on
+mid-hole. That data does not exist in any free feed. ESPN's own metadata says so
+outright:
+
+```
+shotChartAvailable:   false
+playByPlayAvailable:  false
+playByPlaySource:     { description: "none", state: "none" }
+holeByHoleSource:     { description: "feed", state: "full" }   <- what we use
+```
+
+Shot positions come from the PGA Tour's ShotLink system (laser-surveyed GPS, the
+data behind the TV shot tracers), which is proprietary and licensed. A hole is
+therefore only ever *played* or *not played* here — there is no mid-hole state,
+and none is invented.
+
+**Tournament position is computed by us, not read from the feed.** We rank the
+whole field by total using standard competition ranking (ties share a position
+and the next player skips: 1, T2, T2, 4). Players who missed the cut are excluded
+from the ranking pool and shown as `CUT`.
+
+**Hole colours rely on one property of the feed:** each hole's `scoreType` is that
+hole's score to par, not a running total. This is asserted against real data in
+`tests.js` — every full card in a real event sums hole-by-hole to its round score
+(454 of them), and the derived pars reconstruct a par-70 course.
 
 ### How the cut line is worked out
 

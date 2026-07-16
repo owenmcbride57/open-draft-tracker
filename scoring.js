@@ -48,15 +48,28 @@ export async function fetchLeaderboard({ demo = false } = {}) {
   const field = (competition.competitors || []).map((c) => {
     const rounds = {}; // round number -> score to par for that round
     const holes = {}; // round number -> holes completed in it (18 = round done)
+    const cards = {}; // round number -> [{ hole, strokes, result }] in hole order
 
     for (const ls of c.linescores || []) {
       const par = toPar(ls.displayValue);
       if (par == null) continue;
       rounds[ls.period] = par;
-      // ESPN nests the hole-by-hole card inside each round. A round with fewer
-      // than 18 holes is still in progress, and its score is only a running
-      // total — not a round score we can compare against anyone else's.
-      holes[ls.period] = (ls.linescores || []).length;
+
+      // ESPN nests the hole-by-hole card inside each round. Each hole carries
+      // the strokes taken (value) and that hole's result to par (scoreType,
+      // e.g. "-1" birdie, "E" par, "+1" bogey — verified: the per-hole results
+      // sum exactly to the round total). A round with fewer than 18 holes is
+      // still in progress, and its round score is only a running total.
+      const perHole = (ls.linescores || [])
+        .map((h) => ({
+          hole: h.period, // the actual hole number, e.g. 10 for a back-nine start
+          strokes: h.value,
+          result: h.scoreType?.displayValue ?? 'E',
+        }))
+        .sort((a, b) => a.hole - b.hole);
+
+      holes[ls.period] = perHole.length;
+      cards[ls.period] = perHole;
     }
 
     return {
@@ -64,6 +77,7 @@ export async function fetchLeaderboard({ demo = false } = {}) {
       name: c.athlete?.displayName || 'Unknown',
       rounds,
       holes,
+      cards,
       roundsPlayed: Object.keys(rounds).length,
       total: toPar(c.score),
     };
@@ -177,6 +191,34 @@ function worstInRound(field, round) {
     playing, // how many are still out there and could yet post worse
     settled: playing === 0 && posted > 0,
   };
+}
+
+// Did this player miss the cut? Only knowable once round 3 exists: a survivor
+// has a third-round score, a casualty stops at 36 holes.
+function missedCut(player, cut) {
+  return cut.decided && player.roundsPlayed > 0 && player.rounds[3] == null;
+}
+
+// Live tournament position, computed from the field rather than read off a feed
+// field we can't verify until play starts. Standard competition ranking: ties
+// share a position and the next player skips (1, T2, T2, 4). Players who missed
+// the cut are not ranked among the survivors.
+function computeFieldRanks(field, cut) {
+  const active = field
+    .filter((p) => p.total != null && p.roundsPlayed > 0 && !missedCut(p, cut))
+    .sort((a, b) => a.total - b.total);
+
+  const rankById = new Map();
+  let i = 0;
+  while (i < active.length) {
+    let j = i;
+    while (j + 1 < active.length && active[j + 1].total === active[i].total) j++;
+    for (let k = i; k <= j; k++) {
+      rankById.set(active[k].id, { pos: i + 1, tied: j > i });
+    }
+    i = j + 1;
+  }
+  return rankById;
 }
 
 export function computeStandings(board) {
@@ -366,6 +408,66 @@ export function computeStandings(board) {
       return a.total - b.total || a.name.localeCompare(b.name);
     });
 
+  // Live scorecards: for each drafted golfer, where they stand right now and the
+  // hole-by-hole card for the round they're on. ESPN publishes no shot-level or
+  // positional data (shotChartAvailable / playByPlayAvailable are both false),
+  // so a hole is only ever "played" or "not played" — there is no mid-hole state
+  // to show, and we do not invent one.
+  const rankById = computeFieldRanks(field, cut);
+
+  const scorecards = Object.entries(GOLFERS)
+    .map(([key, meta]) => {
+      const p = byId.get(meta.id);
+      const base = { ...meta, key, owners: owners.get(key) ?? [] };
+
+      if (!p) return { ...base, found: false, state: 'missing', total: null, holes: [] };
+      if (p.roundsPlayed === 0) {
+        return { ...base, found: true, state: 'not-started', total: null, holes: [], thru: 0 };
+      }
+
+      const cutGone = missedCut(p, cut);
+      const rank = rankById.get(p.id);
+      const currentRound = Math.max(...Object.keys(p.rounds).map(Number));
+      const card = p.cards?.[currentRound] ?? [];
+      const thru = card.length;
+      const roundComplete = thru >= 18;
+
+      // Always lay out all 18 holes so the grid reads as a scorecard. A player
+      // off the back tee will have holes 10-18 filled and 1-9 empty — that is
+      // genuinely their card, not a gap.
+      const byHole = new Map(card.map((h) => [h.hole, h]));
+      const holes = [];
+      for (let h = 1; h <= 18; h++) {
+        const played = byHole.get(h);
+        holes.push(
+          played
+            ? { hole: h, strokes: played.strokes, result: played.result, played: true }
+            : { hole: h, played: false },
+        );
+      }
+
+      return {
+        ...base,
+        found: true,
+        state: cutGone ? 'cut' : roundComplete ? 'round-done' : 'playing',
+        position: cutGone ? 'CUT' : rank ? `${rank.tied ? 'T' : ''}${rank.pos}` : null,
+        total: p.total,
+        today: p.rounds[currentRound],
+        currentRound,
+        thru,
+        roundComplete,
+        holes,
+      };
+    })
+    // Active golfers first, then the cut, then anyone missing; ranked within.
+    .sort((a, b) => {
+      const group = (g) => (g.state === 'missing' ? 3 : g.state === 'not-started' ? 2 : g.state === 'cut' ? 1 : 0);
+      if (group(a) !== group(b)) return group(a) - group(b);
+      if (a.total == null) return 1;
+      if (b.total == null) return -1;
+      return a.total - b.total || a.name.localeCompare(b.name);
+    });
+
   return {
     rows,
     roundsStarted,
@@ -375,5 +477,6 @@ export function computeStandings(board) {
     predictions,
     cut,
     golferBoard,
+    scorecards,
   };
 }

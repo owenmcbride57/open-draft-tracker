@@ -22,13 +22,14 @@ const cutNoteEl = document.getElementById('cut-note');
 const golferBoardEl = document.getElementById('golfer-board');
 const gLeaderScoreEl = document.getElementById('g-leader-score');
 const gLeaderNamesEl = document.getElementById('g-leader-names');
+const scorecardsEl = document.getElementById('scorecards');
 
 // ---------------------------------------------------------------------------
 // Tabs. Driven off the URL hash so a link to a specific view survives a reload
 // and can be shared into the group chat.
 // ---------------------------------------------------------------------------
 
-const VIEWS = ['draft', 'tracker', 'golfers'];
+const VIEWS = ['draft', 'tracker', 'golfers', 'cards'];
 
 function showView(name) {
   const view = VIEWS.includes(name) ? name : 'draft';
@@ -335,11 +336,108 @@ function renderGolferBoard({ cut, golferBoard, roundsStarted, winningScore, lead
       : inside.map(row).join('') + divider + outside.map(row).join('') + absent.map(row).join('');
 }
 
+// Classify a hole's result for colouring. ESPN gives the hole's score to par
+// directly ("-1" birdie, "E" par, "+1" bogey) — verified against real cards,
+// where the per-hole results sum exactly to the round total.
+function holeClass(result) {
+  if (result === 'E') return 'par';
+  const n = Number(String(result).replace('+', ''));
+  if (!Number.isFinite(n)) return 'par';
+  if (n <= -2) return 'eagle';
+  if (n === -1) return 'birdie';
+  if (n === 0) return 'par';
+  if (n === 1) return 'bogey';
+  return 'double';
+}
+
+function renderScorecards({ scorecards = [], roundsStarted }) {
+  if (!scorecardsEl) return;
+
+  if (roundsStarted === 0) {
+    scorecardsEl.innerHTML = `<li class="cards-empty">
+      No scores yet — cards appear hole by hole once play begins on Thursday.
+    </li>`;
+    return;
+  }
+
+  const grid = (g) =>
+    g.holes
+      .map((h) => {
+        if (!h.played) return `<span class="hole empty" title="Hole ${h.hole}">${h.hole}</span>`;
+        // Par is derivable: strokes minus the hole's score to par.
+        const par = h.strokes - (h.result === 'E' ? 0 : Number(String(h.result).replace('+', '')));
+        return `<span class="hole ${holeClass(h.result)}"
+                      title="Hole ${h.hole} · par ${par} · ${h.strokes} strokes (${h.result})">${h.strokes}</span>`;
+      })
+      .join('');
+
+  const holeNumbers = (g) =>
+    g.holes.map((h) => `<span class="hole-num">${h.hole}</span>`).join('');
+
+  scorecardsEl.innerHTML = scorecards
+    .map((g) => {
+      if (!g.found) {
+        return `<li class="scorecard missing">
+          <div class="sc-head"><span class="sc-name">${g.name}</span>
+          <span class="sc-note">not in field</span></div>
+        </li>`;
+      }
+
+      if (g.state === 'not-started') {
+        return `<li class="scorecard idle">
+          <div class="sc-head">
+            <span class="sc-name">${g.name}</span>
+            <span class="sc-owners">${g.owners.join(', ')}</span>
+            <span class="sc-note">hasn't teed off</span>
+          </div>
+        </li>`;
+      }
+
+      // "Thru" only means something while a round is live. A finished round says
+      // F; a cut golfer has no round to be thru.
+      let thru = '';
+      if (g.state === 'playing') thru = `<span class="sc-thru">thru ${g.thru}</span>`;
+      else if (g.state === 'round-done') thru = `<span class="sc-thru">F</span>`;
+
+      const today =
+        g.state === 'cut'
+          ? ''
+          : `<span class="sc-today">${formatToPar(g.today)} <em>today</em></span>`;
+
+      const pos =
+        g.position == null
+          ? '<span class="sc-pos">—</span>'
+          : `<span class="sc-pos${g.position === 'CUT' ? ' cut' : ''}">${g.position}</span>`;
+
+      return `<li class="scorecard ${g.state}">
+        <div class="sc-head">
+          ${pos}
+          <span class="sc-name">${g.name}</span>
+          <span class="sc-owners">${g.owners.join(', ')}</span>
+          ${today}
+          ${thru}
+          <span class="sc-total">${formatToPar(g.total)}</span>
+        </div>
+        ${
+          g.state === 'cut'
+            ? '<p class="sc-cutnote">Missed the cut — no further rounds.</p>'
+            : `<div class="card-grid">
+                 <div class="hole-nums">${holeNumbers(g)}</div>
+                 <div class="holes">${grid(g)}</div>
+                 <p class="sc-round-label">Round ${g.currentRound}</p>
+               </div>`
+        }
+      </li>`;
+    })
+    .join('');
+}
+
 function render(board, standings) {
   const { rows, roundsStarted, penalties, winningScore } = standings;
 
   renderLeaderPanel(standings);
   renderGolferBoard(standings);
+  renderScorecards(standings);
 
   // A pick number only means something once someone has actually posted a score.
   const live = roundsStarted > 0;

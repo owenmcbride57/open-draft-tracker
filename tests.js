@@ -52,15 +52,26 @@ const id = (key) => GOLFERS[key].id;
 function player(name, rounds, playerId, holesInLastRound = 18) {
   const r = {};
   const h = {};
+  const cards = {};
   rounds.forEach((v, i) => {
-    r[i + 1] = v;
-    h[i + 1] = i === rounds.length - 1 ? holesInLastRound : 18;
+    const round = i + 1;
+    const played = i === rounds.length - 1 ? holesInLastRound : 18;
+    r[round] = v;
+    h[round] = played;
+    // A synthetic card: every hole a par except hole 1, which carries the whole
+    // round's score so the per-hole results still sum to the round total.
+    cards[round] = Array.from({ length: played }, (_, k) => ({
+      hole: k + 1,
+      strokes: k === 0 ? 4 + v : 4,
+      result: k === 0 ? (v === 0 ? 'E' : v > 0 ? `+${v}` : `${v}`) : 'E',
+    }));
   });
   return {
     id: playerId,
     name,
     rounds: r,
     holes: h,
+    cards,
     roundsPlayed: rounds.length,
     total: rounds.reduce((a, b) => a + b, 0),
   };
@@ -392,6 +403,94 @@ check('before the tournament starts there is no leader and no closest prediction
   assert.equal(predictions[predictions.length - 1].manager, 'Harry');
 });
 
+group('live scorecards');
+
+check('tournament position uses standard ranking — ties share it, the next skips', () => {
+  const field = [
+    player('Scottie Scheffler', [-6], GOLFERS.scheffler.id), // -6, outright 1st
+    player('Rory McIlroy', [-4], GOLFERS.mcilroy.id), // -4, tied
+    player('Collin Morikawa', [-4], GOLFERS.morikawa.id), // -4, tied
+    player('Jon Rahm', [-1], GOLFERS.rahm.id), // -1, so 4th (2 and 3 consumed)
+  ];
+  const { scorecards } = computeStandings(board(field));
+  const pos = (id) => scorecards.find((g) => g.id === id).position;
+
+  assert.equal(pos(GOLFERS.scheffler.id), '1', 'outright lead is not tied');
+  assert.equal(pos(GOLFERS.mcilroy.id), 'T2');
+  assert.equal(pos(GOLFERS.morikawa.id), 'T2');
+  assert.equal(pos(GOLFERS.rahm.id), '4', 'two players tied at 2 means the next is 4th');
+});
+
+check('a mid-round golfer reports today’s score and holes played', () => {
+  const field = [
+    player('Scottie Scheffler', [-2, -3], GOLFERS.scheffler.id, 12), // 12 holes into R2
+    player('Rory McIlroy', [0, 0], GOLFERS.mcilroy.id),
+  ];
+  const { scorecards } = computeStandings(board(field));
+  const s = scorecards.find((g) => g.id === GOLFERS.scheffler.id);
+
+  assert.equal(s.state, 'playing');
+  assert.equal(s.currentRound, 2);
+  assert.equal(s.thru, 12, 'twelve holes of round two are in');
+  assert.equal(s.today, -3, 'today is the running round score, not the total');
+  assert.equal(s.total, -5, 'total is still the full to-par');
+  assert.equal(s.roundComplete, false);
+});
+
+check('a completed round reads as finished, not still playing', () => {
+  const field = [player('Scottie Scheffler', [-2], GOLFERS.scheffler.id, 18)];
+  const { scorecards } = computeStandings(board(field));
+  const s = scorecards.find((g) => g.id === GOLFERS.scheffler.id);
+  assert.equal(s.state, 'round-done');
+  assert.equal(s.thru, 18);
+  assert.equal(s.roundComplete, true);
+});
+
+check('the card lays out all 18 holes, marking the unplayed ones', () => {
+  const field = [player('Scottie Scheffler', [-1], GOLFERS.scheffler.id, 5)];
+  const { scorecards } = computeStandings(board(field));
+  const s = scorecards.find((g) => g.id === GOLFERS.scheffler.id);
+
+  assert.equal(s.holes.length, 18, 'always a full scorecard');
+  assert.equal(s.holes.filter((h) => h.played).length, 5, 'five holes played');
+  assert.equal(s.holes[0].played, true);
+  assert.equal(s.holes[0].hole, 1);
+  assert.equal(s.holes[17].played, false, 'hole 18 not reached');
+  assert.ok(s.holes.every((h, i) => h.hole === i + 1), 'holes are in course order 1-18');
+});
+
+check('a cut golfer is marked CUT and carries no live round', () => {
+  const field = [
+    player('Rory McIlroy', [4, 4], GOLFERS.mcilroy.id), // no round 3 -> cut
+    player('Scottie Scheffler', [-2, -2, -2], GOLFERS.scheffler.id), // survived
+  ];
+  const { scorecards } = computeStandings(board(field));
+  const rory = scorecards.find((g) => g.id === GOLFERS.mcilroy.id);
+  const scottie = scorecards.find((g) => g.id === GOLFERS.scheffler.id);
+
+  assert.equal(rory.state, 'cut');
+  assert.equal(rory.position, 'CUT', 'not given a live position among survivors');
+  assert.equal(scottie.position, '1', 'the survivor is ranked, and the cut player is not in the pool');
+});
+
+check('a golfer who has not teed off shows no position or card', () => {
+  const field = Object.values(GOLFERS).map((g) => player(g.name, [], g.id));
+  const { scorecards } = computeStandings(board(field, { started: false }));
+  assert.ok(scorecards.every((g) => g.state === 'not-started'));
+  assert.ok(scorecards.every((g) => g.position == null));
+  assert.ok(scorecards.every((g) => g.holes.length === 0));
+});
+
+check('every drafted golfer gets a card, active ones first', () => {
+  const field = [
+    player('Rory McIlroy', [5, 5], GOLFERS.mcilroy.id), // cut
+    player('Scottie Scheffler', [-2, -2, -2], GOLFERS.scheffler.id), // playing
+  ];
+  const { scorecards } = computeStandings(board(field));
+  assert.equal(scorecards.length, Object.keys(GOLFERS).length, 'all 11 golfers listed');
+  assert.equal(scorecards[0].id, GOLFERS.scheffler.id, 'the active golfer sorts above the cut one');
+});
+
 group('cut line');
 
 check('projects the cut at the 70th player and ties while rounds 1-2 are live', () => {
@@ -545,15 +644,20 @@ try {
   realField = ev.competitions[0].competitors.map((c) => {
     const rounds = {};
     const holes = {};
+    const cards = {};
     for (const ls of c.linescores || []) {
       rounds[ls.period] = toPar(ls.displayValue);
       holes[ls.period] = (ls.linescores || []).length;
+      cards[ls.period] = (ls.linescores || [])
+        .map((h) => ({ hole: h.period, strokes: h.value, result: h.scoreType?.displayValue ?? 'E' }))
+        .sort((a, b) => a.hole - b.hole);
     }
     return {
       id: c.id,
       name: c.athlete.displayName,
       rounds,
       holes,
+      cards,
       roundsPlayed: Object.keys(rounds).length,
       total: toPar(c.score),
     };
@@ -583,6 +687,35 @@ check('ESPN really does give 18 holes per completed round (the fix depends on it
   }
   assert.ok(checked > 400, `expected hundreds of completed rounds, saw ${checked}`);
   log(`      ${checked} completed rounds, all carrying a full 18-hole card`, 'note');
+});
+
+check('per-hole results sum to the round score, for every card in the field', () => {
+  // This is the assumption the scorecard grid rests on: scoreType is the score
+  // for THAT hole (birdie/par/bogey), not a running total. If ESPN ever changed
+  // it to cumulative, the colours would be nonsense — so assert it on real data.
+  let cards = 0;
+  for (const p of realField) {
+    for (const [round, card] of Object.entries(p.cards)) {
+      if (card.length < 18) continue;
+      const sum = card.reduce((a, h) => a + toPar(h.result), 0);
+      assert.equal(sum, p.rounds[round], `${p.name} round ${round}: holes sum to ${sum}, round is ${p.rounds[round]}`);
+      cards++;
+    }
+  }
+  assert.ok(cards > 400, `expected hundreds of cards, checked ${cards}`);
+  log(`      ${cards} full cards, every one summing hole-by-hole to its round score`, 'note');
+});
+
+check('a real card yields a sensible par for every hole', () => {
+  // The grid derives par as strokes - holeResult. Par must land in 3..5.
+  const p = realField.find((x) => x.roundsPlayed === 4);
+  const card = p.cards[1];
+  const pars = card.map((h) => h.strokes - toPar(h.result));
+  assert.ok(pars.every((n) => n >= 3 && n <= 5), `implausible pars: ${pars.join(',')}`);
+  assert.equal(pars.length, 18);
+  const total = pars.reduce((a, b) => a + b, 0);
+  assert.ok(total >= 68 && total <= 74, `course par worked out to ${total}, expected ~70-72`);
+  log(`      ${p.name}'s round 1 implies a par-${total} course`, 'note');
 });
 
 check('our per-round parsing sums to ESPN’s own total for every finisher', () => {
