@@ -151,7 +151,7 @@ function entryCard(row, roundsStarted, live) {
   if (row.unresolved) {
     tieNote = `<span class="chip danger">dead heat with ${row.unresolvedWith.join(', ')} — league must settle</span>`;
   } else if (row.tiedOnScore) {
-    tieNote = `<span class="chip">tied on score — separated by prediction ${formatToPar(row.prediction)}</span>`;
+    tieNote = `<span class="chip">tied — tiebreaker settled · predicted ${formatToPar(row.prediction)}</span>`;
   }
 
   const picksPreview = row.golfers.map((g) => g.name.split(' ').slice(-1)[0]).join(' · ');
