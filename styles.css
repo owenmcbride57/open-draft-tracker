@@ -397,7 +397,7 @@ main {
 
 .golfer-row {
   display: grid;
-  grid-template-columns: minmax(8rem, 1fr) minmax(0, 1.35fr) auto auto 3.5rem;
+  grid-template-columns: 2.75rem minmax(8rem, 1fr) minmax(0, 1.35fr) auto auto 3.5rem;
   align-items: center;
   gap: 0.75rem;
   padding: 0.7rem 1rem;
@@ -408,6 +408,18 @@ main {
 
 .golfer-row.outside { opacity: 0.75; }
 .golfer-row.outside .g-name { color: var(--muted); }
+
+/* Overall place in the field, shown alongside the list's relative order. */
+.g-pos {
+  font-family: var(--mono);
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--gold);
+  text-align: center;
+}
+
+.g-pos.cut { color: var(--red); font-size: 0.72rem; }
+.g-pos.none { color: var(--muted); font-weight: 400; }
 
 .g-name { font-weight: 600; font-size: 0.95rem; }
 
@@ -758,9 +770,47 @@ body.demo .refresh-line {
 
 .golfer:last-child { border-bottom: 0; }
 
-.golfer-name { display: flex; align-items: center; gap: 0.45rem; }
+.golfer-name { display: flex; align-items: center; gap: 0.45rem; flex-wrap: wrap; }
 
 .golfer.is-cut .golfer-name { color: var(--muted); }
+
+/* Per-golfer round progress: a mini bar that fills hole by hole, plus a label
+   (Not started → thru N → F). Sits inline after the golfer's name. */
+.hole-progress {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.hp-bar {
+  width: 42px;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  overflow: hidden;
+}
+
+.hp-fill {
+  display: block;
+  height: 100%;
+  background: var(--muted);
+  border-radius: 999px;
+  transition: width 0.3s ease;
+}
+
+.hp-label {
+  font-family: var(--mono);
+  font-size: 0.66rem;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.hole-progress.idle .hp-label { color: #4d7361; }
+.hole-progress.live .hp-fill { background: var(--gold); }
+.hole-progress.live .hp-label { color: var(--gold); }
+.hole-progress.done .hp-fill { background: var(--green); }
+.hole-progress.done .hp-label { color: var(--green); }
 
 .badge {
   font-size: 0.6rem;
@@ -857,13 +907,14 @@ footer p { margin: 0; }
   .cut-head .cut-stat:last-child { text-align: left; }
 
   .golfer-row {
-    grid-template-columns: minmax(0, 1fr) 3.25rem;
+    grid-template-columns: 2.5rem minmax(0, 1fr) 3.25rem;
     grid-template-areas:
-      "name   total"
-      "owners owners"
-      "rounds margin";
+      "pos name   total"
+      ".   owners owners"
+      ".   rounds margin";
     row-gap: 0.45rem;
   }
+  .g-pos { grid-area: pos; align-self: center; }
   .g-name { grid-area: name; }
   .g-total { grid-area: total; }
   .g-owners { grid-area: owners; white-space: normal; }

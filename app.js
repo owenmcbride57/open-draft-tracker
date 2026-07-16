@@ -80,6 +80,30 @@ function roundCells(golfer, roundsStarted) {
   return cells.join('');
 }
 
+// A per-golfer progress indicator for the round they're on: not started → thru
+// N → F. A missed-cut golfer has no live round, so the MC badge stands in for it.
+function holeIndicator(golfer) {
+  if (golfer.missing || golfer.cut) return '';
+
+  const thru = golfer.thru ?? 0;
+  let cls = 'idle';
+  let label = 'Not started';
+  if (golfer.roundComplete) {
+    cls = 'done';
+    label = 'F';
+  } else if (thru > 0) {
+    cls = 'live';
+    label = `thru ${thru}`;
+  }
+
+  const pct = golfer.roundComplete ? 100 : Math.round((thru / 18) * 100);
+  const round = golfer.currentRound ? ` of round ${golfer.currentRound}` : '';
+  return `<span class="hole-progress ${cls}" title="${label}${round}">
+    <span class="hp-bar"><span class="hp-fill" style="width:${pct}%"></span></span>
+    <span class="hp-label">${label}</span>
+  </span>`;
+}
+
 function golferRow(golfer, roundsStarted) {
   if (golfer.missing) {
     return `<li class="golfer missing">
@@ -91,7 +115,7 @@ function golferRow(golfer, roundsStarted) {
 
   const badge = golfer.cut ? '<span class="badge cut">MC</span>' : '';
   return `<li class="golfer${golfer.cut ? ' is-cut' : ''}">
-    <span class="golfer-name">${golfer.name}${badge}</span>
+    <span class="golfer-name">${golfer.name}${badge}${holeIndicator(golfer)}</span>
     <span class="rounds">${roundCells(golfer, roundsStarted)}</span>
     <span class="golfer-total">${formatToPar(golfer.total)}</span>
   </li>`;
@@ -309,7 +333,16 @@ function renderGolferBoard({ cut, golferBoard, roundsStarted, winningScore, lead
 
     const crown = leaders.includes(g.name) ? '<span class="badge lead">LEADER</span>' : '';
 
+    // Overall place in the whole field, alongside the relative placing this
+    // list already conveys by order and the cut divider. CUT for the eliminated,
+    // — before there is anything to rank.
+    const pos =
+      g.position == null
+        ? '<span class="g-pos none">—</span>'
+        : `<span class="g-pos${g.position === 'CUT' ? ' cut' : ''}">${g.position}</span>`;
+
     return `<li class="golfer-row ${standing}${crown ? ' is-leader' : ''}">
+      ${pos}
       <span class="g-name">${g.name}${crown}</span>
       <span class="g-owners"><span class="count">${g.owners.length}×</span> ${g.owners.join(', ')}</span>
       <span class="g-rounds">${rounds(g)}</span>

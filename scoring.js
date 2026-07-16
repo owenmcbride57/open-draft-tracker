@@ -278,6 +278,19 @@ export function computeStandings(board) {
         }
       }
 
+      // Live progress through the golfer's current round, for the draft board's
+      // per-golfer hole indicator (not started → thru N → round complete). ESPN
+      // has no mid-hole state, so a hole is only ever played or not — "thru N"
+      // counts the holes whose cards are in.
+      let thru = 0;
+      let currentRound = 0;
+      let roundComplete = false;
+      if (player.roundsPlayed > 0) {
+        currentRound = Math.max(...Object.keys(player.rounds).map(Number));
+        thru = player.holes?.[currentRound] ?? 0;
+        roundComplete = thru >= HOLES;
+      }
+
       return {
         ...meta,
         missing: false,
@@ -287,6 +300,9 @@ export function computeStandings(board) {
         total: roundsStarted > 0 ? total : null,
         penaltyRounds,
         cut: penaltyRounds.length > 0,
+        thru,
+        currentRound,
+        roundComplete,
       };
     });
 
@@ -365,6 +381,11 @@ export function computeStandings(board) {
   // they stand against the cut.
   const cut = computeCut(field, roundsStarted);
 
+  // Each golfer's actual place in the whole field (not just among the drafted
+  // ones), shared by the leaderboard and scorecard views. Standard competition
+  // ranking; cut players are excluded from the pool and shown as CUT.
+  const rankById = computeFieldRanks(field, cut);
+
   // Owners are listed side by side against each golfer, so use the short name
   // where one is set. Scheffler carries seven of them.
   const owners = new Map();
@@ -387,12 +408,25 @@ export function computeStandings(board) {
       const projectedIn =
         cut.decided || cut.line == null || total == null ? null : total <= cut.line;
 
+      // Overall place in the field, alongside the golfer's relative placing in
+      // this drafted list. A cut golfer is out of the ranked pool → CUT; before
+      // there is anything to rank it is simply null (rendered as —).
+      const rank = player ? rankById.get(player.id) : null;
+      const position = !player
+        ? null
+        : missedCut(player, cut)
+          ? 'CUT'
+          : rank
+            ? `${rank.tied ? 'T' : ''}${rank.pos}`
+            : null;
+
       return {
         ...meta,
         key,
         owners: owners.get(key) ?? [],
         found: !!player,
         total,
+        position,
         rounds: player?.rounds ?? {},
         roundsPlayed: player?.roundsPlayed ?? 0,
         madeCut,
@@ -412,9 +446,8 @@ export function computeStandings(board) {
   // hole-by-hole card for the round they're on. ESPN publishes no shot-level or
   // positional data (shotChartAvailable / playByPlayAvailable are both false),
   // so a hole is only ever "played" or "not played" — there is no mid-hole state
-  // to show, and we do not invent one.
-  const rankById = computeFieldRanks(field, cut);
-
+  // to show, and we do not invent one. (rankById is computed above, shared with
+  // the leaderboard view.)
   const scorecards = Object.entries(GOLFERS)
     .map(([key, meta]) => {
       const p = byId.get(meta.id);
