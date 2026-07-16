@@ -80,6 +80,25 @@ function roundCells(golfer, roundsStarted) {
   return cells.join('');
 }
 
+// A small round thumbnail for a golfer, from ESPN's headshot CDN keyed by the
+// same athlete id we pin in config.js. If the image 404s (or the CDN is blocked)
+// it removes itself, revealing the golfer's initials underneath — so a name is
+// never left with an empty or broken image beside it.
+function avatar(g) {
+  const initials = g.name
+    .split(/\s+/)
+    .map((w) => w[0])
+    .filter(Boolean)
+    .slice(0, 2)
+    .join('')
+    .toUpperCase();
+  return `<span class="avatar" aria-hidden="true">
+    <span class="avatar-fallback">${initials}</span>
+    <img src="https://a.espncdn.com/i/headshots/golf/players/full/${g.id}.png"
+         alt="" loading="lazy" decoding="async" onerror="this.remove()" />
+  </span>`;
+}
+
 // A per-golfer progress indicator for the round they're on: not started → thru
 // N → F. A missed-cut golfer has no live round, so the MC badge stands in for it.
 function holeIndicator(golfer) {
@@ -310,7 +329,7 @@ function renderGolferBoard({ cut, golferBoard, roundsStarted, winningScore, lead
   const row = (g) => {
     if (!g.found) {
       return `<li class="golfer-row missing">
-        <span class="g-name">${g.name}</span>
+        <span class="g-name">${avatar(g)}${g.name}</span>
         <span class="g-note">not in field</span>
       </li>`;
     }
@@ -343,7 +362,7 @@ function renderGolferBoard({ cut, golferBoard, roundsStarted, winningScore, lead
 
     return `<li class="golfer-row ${standing}${crown ? ' is-leader' : ''}">
       ${pos}
-      <span class="g-name">${g.name}${crown}</span>
+      <span class="g-name">${avatar(g)}${g.name}${crown}</span>
       <span class="g-owners"><span class="count">${g.owners.length}×</span> ${g.owners.join(', ')}</span>
       <span class="g-rounds">${rounds(g)}</span>
       ${margin}
@@ -411,7 +430,7 @@ function renderScorecards({ scorecards = [], roundsStarted }) {
     .map((g) => {
       if (!g.found) {
         return `<li class="scorecard missing">
-          <div class="sc-head"><span class="sc-name">${g.name}</span>
+          <div class="sc-head"><span class="sc-name">${avatar(g)}${g.name}</span>
           <span class="sc-note">not in field</span></div>
         </li>`;
       }
@@ -419,7 +438,7 @@ function renderScorecards({ scorecards = [], roundsStarted }) {
       if (g.state === 'not-started') {
         return `<li class="scorecard idle">
           <div class="sc-head">
-            <span class="sc-name">${g.name}</span>
+            <span class="sc-name">${avatar(g)}${g.name}</span>
             <span class="sc-owners">${g.owners.join(', ')}</span>
             <span class="sc-note">hasn't teed off</span>
           </div>
@@ -445,7 +464,7 @@ function renderScorecards({ scorecards = [], roundsStarted }) {
       return `<li class="scorecard ${g.state}">
         <div class="sc-head">
           ${pos}
-          <span class="sc-name">${g.name}</span>
+          <span class="sc-name">${avatar(g)}${g.name}</span>
           <span class="sc-owners">${g.owners.join(', ')}</span>
           ${today}
           ${thru}

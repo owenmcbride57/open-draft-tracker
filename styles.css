@@ -421,7 +421,40 @@ main {
 .g-pos.cut { color: var(--red); font-size: 0.72rem; }
 .g-pos.none { color: var(--muted); font-weight: 400; }
 
-.g-name { font-weight: 600; font-size: 0.95rem; }
+.g-name { display: flex; align-items: center; gap: 0.5rem; font-weight: 600; font-size: 0.95rem; }
+
+/* Golfer headshot thumbnail (leaderboard + scorecards). The initials sit
+   underneath and show through if the CDN image fails to load or removes itself. */
+.avatar {
+  position: relative;
+  flex: 0 0 auto;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.avatar img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 12%;
+}
+
+.avatar-fallback {
+  font-family: var(--mono);
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--muted);
+}
 
 /* Scheffler is owned by seven managers. Truncating that to "…" hid exactly the
    information the row exists to convey, so let it wrap onto a second line. */
@@ -543,7 +576,7 @@ main {
 
 .sc-pos.cut { color: var(--red); font-size: 0.8rem; }
 
-.sc-name { font-weight: 600; font-size: 0.95rem; }
+.sc-name { display: flex; align-items: center; gap: 0.5rem; font-weight: 600; font-size: 0.95rem; }
 
 .sc-owners {
   font-size: 0.75rem;
