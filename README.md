@@ -65,6 +65,23 @@ button moves between tabs.
 - **Scorecards** (`#cards`) — live position, today's score, holes played and a
   hole-by-hole card for every drafted golfer.
 
+### Tee times for upcoming rounds
+
+Any golfer who has **not yet started their next round** shows a ⛳ tee-time chip —
+on the draft board, the leaderboard and the scorecards. Before Thursday that's
+their round-1 tee; between rounds it becomes the next round's tee the moment ESPN
+publishes the pairing, and until then there's nothing to show. A golfer who is
+mid-round, has finished the tournament, or missed the cut has no upcoming round,
+so no chip. ESPN stamps each tee time with the round it belongs to, so "has not
+started it" is read straight off the feed rather than guessed.
+
+The time is rendered in **the viewer's own local timezone** — the browser knows
+where you are, so a manager in California sees Pacific and one in Scotland sees
+BST from the same shared instant, each with the zone spelled out (e.g.
+`⛳ 9:15 AM BST`) so a screenshot is never ambiguous. The weekday is added when the
+tee isn't today. If the feed hasn't published a tee time yet, the chip simply
+doesn't appear — none is ever invented.
+
 ### What the Scorecards tab can and cannot show
 
 It shows live tournament position, today's round score, "thru" count, total, and

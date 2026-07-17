@@ -421,7 +421,10 @@ main {
 .g-pos.cut { color: var(--red); font-size: 0.72rem; }
 .g-pos.none { color: var(--muted); font-weight: 400; }
 
-.g-name { display: flex; align-items: center; gap: 0.5rem; font-weight: 600; font-size: 0.95rem; }
+.g-name { display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem 0.5rem; min-width: 0; font-weight: 600; font-size: 0.95rem; }
+/* The tee-time chip drops onto its own line under the name rather than crowding
+   the owners column beside it. */
+.g-name .tee-time { flex-basis: 100%; }
 
 /* Golfer headshot thumbnail (leaderboard + scorecards). The initials sit
    underneath and show through if the CDN image fails to load or removes itself. */
@@ -844,6 +847,24 @@ body.demo .refresh-line {
 .hole-progress.live .hp-label { color: var(--gold); }
 .hole-progress.done .hp-fill { background: var(--green); }
 .hole-progress.done .hp-label { color: var(--green); }
+
+/* Upcoming tee time. A small chip shown beside a golfer who is waiting to start
+   their next round — on the draft board, the leaderboard and the scorecards. The
+   time itself is rendered in the viewer's own local timezone (see app.js). */
+.tee-time {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  font-family: var(--mono);
+  font-size: 0.66rem;
+  font-weight: 600;
+  white-space: nowrap;
+  color: var(--green);
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 0.1rem 0.45rem;
+}
 
 .badge {
   font-size: 0.6rem;

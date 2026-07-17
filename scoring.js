@@ -72,6 +72,13 @@ export async function fetchLeaderboard({ demo = false } = {}) {
       cards[ls.period] = perHole;
     }
 
+    // ESPN carries the tee time for the round the player is about to (or has
+    // just begun to) play on the competitor's status, alongside which round
+    // (period) it refers to. We keep the raw ISO instant — the browser turns it
+    // into the viewer's own local time at render — and never invent one: if the
+    // feed hasn't published the next round's pairings yet, teeTime is simply null.
+    const st = c.status || {};
+
     return {
       id: c.id,
       name: c.athlete?.displayName || 'Unknown',
@@ -80,6 +87,8 @@ export async function fetchLeaderboard({ demo = false } = {}) {
       cards,
       roundsPlayed: Object.keys(rounds).length,
       total: toPar(c.score),
+      teeTime: st.teeTime ?? null,
+      teePeriod: st.period ?? null,
     };
   });
 
@@ -199,6 +208,36 @@ function missedCut(player, cut) {
   return cut.decided && player.roundsPlayed > 0 && player.rounds[3] == null;
 }
 
+// The tee time for a golfer's *upcoming* round — but only while they genuinely
+// have not started it. Returns the raw ISO instant (formatted into the viewer's
+// local time by the render layer) or null.
+//
+// "Not started their next round" is read off the feed rather than guessed: the
+// tee time is stamped with the round (period) it belongs to, so if the golfer
+// already has a card for that round they're mid-play — nothing to count down to.
+// Before the tournament this is their round-1 tee; between rounds it becomes the
+// next round's tee the moment ESPN publishes the pairing, and until then it's
+// null. A golfer who has finished the tournament, or missed the cut, has no next
+// round and so no upcoming tee.
+function upcomingTee(player, cut) {
+  const iso = player.teeTime;
+  if (!iso || !Number.isFinite(Date.parse(iso))) return null;
+  if (missedCut(player, cut)) return null;
+
+  const period = player.teePeriod;
+  if (period != null) {
+    // They've begun the round the tee time is for → it's not upcoming.
+    const begun = player.rounds[period] != null || (player.holes?.[period] ?? 0) > 0;
+    if (begun) return null;
+  } else if (player.roundsPlayed > 0) {
+    // No period in the feed: fall back to progress. Only a golfer whose latest
+    // round is complete is waiting on a next tee; a mid-round one is not.
+    const cur = Math.max(...Object.keys(player.rounds).map(Number));
+    if ((player.holes?.[cur] ?? 0) < HOLES) return null;
+  }
+  return iso;
+}
+
 // Live tournament position, computed from the field rather than read off a feed
 // field we can't verify until play starts. Standard competition ranking: ties
 // share a position and the next player skips (1, T2, T2, 4). Players who missed
@@ -249,6 +288,11 @@ export function computeStandings(board) {
           (best, p) => (p.total != null && (best == null || p.total < best) ? p.total : best),
           null,
         );
+
+  // Where the cut currently sits. Computed up front because the draft board, the
+  // golfer board and the scorecards all need it — not least to know whether a
+  // golfer even has a next round to show a tee time for.
+  const cut = computeCut(field, roundsStarted);
 
   const rows = ENTRIES.map((entry) => {
     const golfers = entry.picks.map((key) => {
@@ -303,6 +347,8 @@ export function computeStandings(board) {
         thru,
         currentRound,
         roundComplete,
+        // Tee time for the round they're waiting to start (null once they've begun).
+        teeTime: upcomingTee(player, cut),
       };
     });
 
@@ -376,11 +422,6 @@ export function computeStandings(board) {
       : a.delta - b.delta || a.manager.localeCompare(b.manager),
   );
 
-  // Every golfer the league drafted, with their real live score (no penalty
-  // applied — this view is about the golfer, not the fantasy maths) and where
-  // they stand against the cut.
-  const cut = computeCut(field, roundsStarted);
-
   // Each golfer's actual place in the whole field (not just among the drafted
   // ones), shared by the leaderboard and scorecard views. Standard competition
   // ranking; cut players are excluded from the pool and shown as CUT.
@@ -434,6 +475,8 @@ export function computeStandings(board) {
         // Strokes inside (negative) or outside (positive) the line.
         toCut: total != null && cut.line != null ? total - cut.line : null,
         inside: cut.decided ? survived : projectedIn,
+        // Tee time for their upcoming round, while they've yet to start it.
+        teeTime: player ? upcomingTee(player, cut) : null,
       };
     })
     .sort((a, b) => {
@@ -455,7 +498,15 @@ export function computeStandings(board) {
 
       if (!p) return { ...base, found: false, state: 'missing', total: null, holes: [] };
       if (p.roundsPlayed === 0) {
-        return { ...base, found: true, state: 'not-started', total: null, holes: [], thru: 0 };
+        return {
+          ...base,
+          found: true,
+          state: 'not-started',
+          total: null,
+          holes: [],
+          thru: 0,
+          teeTime: upcomingTee(p, cut),
+        };
       }
 
       const cutGone = missedCut(p, cut);
@@ -490,6 +541,8 @@ export function computeStandings(board) {
         thru,
         roundComplete,
         holes,
+        // Set only between rounds: the tee time for the round they're yet to start.
+        teeTime: upcomingTee(p, cut),
       };
     })
     // Active golfers first, then the cut, then anyone missing; ranked within.

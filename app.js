@@ -58,6 +58,37 @@ const ORDINALS = ['1st', '2nd', '3rd', '4th', '5th', '6th', '7th', '8th', '9th',
 // collapse a card someone is reading.
 const expanded = new Set();
 
+// Turn an ISO tee-time instant into the viewer's own local clock time. Passing
+// no locale/zone to toLocaleTimeString uses the browser's timezone, so the time
+// shown is automatically local to whoever is looking — a viewer in California
+// sees Pacific, one in London sees BST, from the one shared instant. timeZoneName
+// makes the zone explicit so a shared screenshot is never ambiguous, and the
+// weekday is added when the tee isn't today (e.g. tomorrow's round). Returns null
+// for a missing or unparseable time so callers can simply fall back.
+function formatTeeTime(iso) {
+  if (!iso) return null;
+  const t = new Date(iso);
+  if (Number.isNaN(t.getTime())) return null;
+
+  const time = t.toLocaleTimeString([], {
+    hour: 'numeric',
+    minute: '2-digit',
+    timeZoneName: 'short',
+  });
+  const sameDay = t.toDateString() === new Date().toDateString();
+  if (sameDay) return time;
+  return `${t.toLocaleDateString([], { weekday: 'short' })} ${time}`;
+}
+
+// A small tee-time chip: a golf flag and the upcoming tee in the viewer's local
+// time. Empty string when there's no upcoming tee, so it drops out cleanly.
+function teeTag(iso) {
+  const t = formatTeeTime(iso);
+  return t
+    ? `<span class="tee-time" title="Tee time for the upcoming round — your local time">⛳ ${t}</span>`
+    : '';
+}
+
 function roundCells(golfer, roundsStarted) {
   const cells = [];
   for (let r = 1; r <= 4; r++) {
@@ -117,10 +148,14 @@ function holeIndicator(golfer) {
 
   const pct = golfer.roundComplete ? 100 : Math.round((thru / 18) * 100);
   const round = golfer.currentRound ? ` of round ${golfer.currentRound}` : '';
+  // Waiting to start a round (not yet teed off, or done for the day with the next
+  // round's tee published) — show when they go out. scoring.js only sets teeTime
+  // while the round genuinely hasn't started, so no extra guard is needed here.
+  const tee = teeTag(golfer.teeTime);
   return `<span class="hole-progress ${cls}" title="${label}${round}">
     <span class="hp-bar"><span class="hp-fill" style="width:${pct}%"></span></span>
     <span class="hp-label">${label}</span>
-  </span>`;
+  </span>${tee}`;
 }
 
 function golferRow(golfer, roundsStarted) {
@@ -362,7 +397,7 @@ function renderGolferBoard({ cut, golferBoard, roundsStarted, winningScore, lead
 
     return `<li class="golfer-row ${standing}${crown ? ' is-leader' : ''}">
       ${pos}
-      <span class="g-name">${avatar(g)}${g.name}${crown}</span>
+      <span class="g-name">${avatar(g)}${g.name}${crown}${teeTag(g.teeTime)}</span>
       <span class="g-owners"><span class="count">${g.owners.length}×</span> ${g.owners.join(', ')}</span>
       <span class="g-rounds">${rounds(g)}</span>
       ${margin}
@@ -436,11 +471,12 @@ function renderScorecards({ scorecards = [], roundsStarted }) {
       }
 
       if (g.state === 'not-started') {
+        const tee = formatTeeTime(g.teeTime);
         return `<li class="scorecard idle">
           <div class="sc-head">
             <span class="sc-name">${avatar(g)}${g.name}</span>
             <span class="sc-owners">${g.owners.join(', ')}</span>
-            <span class="sc-note">hasn't teed off</span>
+            <span class="sc-note">${tee ? `tees off ⛳ ${tee}` : "hasn't teed off"}</span>
           </div>
         </li>`;
       }
@@ -464,7 +500,7 @@ function renderScorecards({ scorecards = [], roundsStarted }) {
       return `<li class="scorecard ${g.state}">
         <div class="sc-head">
           ${pos}
-          <span class="sc-name">${avatar(g)}${g.name}</span>
+          <span class="sc-name">${avatar(g)}${g.name}${teeTag(g.teeTime)}</span>
           <span class="sc-owners">${g.owners.join(', ')}</span>
           ${today}
           ${thru}

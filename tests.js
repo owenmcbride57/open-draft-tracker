@@ -631,6 +631,79 @@ check('formatToPar renders E, minus and plus', () => {
 
 // ---------------------------------------------------------------------------
 
+group('tee times');
+
+// ESPN stamps a tee time on the competitor status along with the round (period)
+// it belongs to. We keep it as a raw ISO instant on the field player; scoring
+// only surfaces it while the golfer genuinely hasn't started that round.
+const TEE = '2026-07-16T09:15Z';
+const withTee = (p, teeTime, teePeriod) => ({ ...p, teeTime, teePeriod });
+
+check('a golfer yet to tee off carries their round-1 tee time everywhere', () => {
+  const field = Object.values(GOLFERS).map((g) => withTee(player(g.name, [], g.id), TEE, 1));
+  const { rows, scorecards, golferBoard } = computeStandings(board(field, { started: false }));
+
+  assert.ok(scorecards.every((g) => g.teeTime === TEE), 'every scorecard shows the tee');
+  assert.ok(golferBoard.every((g) => g.teeTime === TEE), 'every leaderboard row shows the tee');
+  const drafted = rows.flatMap((r) => r.golfers).find((x) => x.id === GOLFERS.scheffler.id);
+  assert.equal(drafted.teeTime, TEE, 'the draft board shows it too');
+});
+
+check('a golfer mid-round has no upcoming tee time', () => {
+  // On the course in round 1 (9 holes in): the tee time is for the round already
+  // begun, so there is nothing upcoming to count down to.
+  const field = [withTee(player('Scottie Scheffler', [-2], GOLFERS.scheffler.id, 9), TEE, 1)];
+  const s = computeStandings(board(field)).scorecards.find((g) => g.id === GOLFERS.scheffler.id);
+  assert.equal(s.state, 'playing');
+  assert.ok(s.teeTime == null, 'no tee time while playing');
+});
+
+check('a golfer between rounds shows the next round’s tee time', () => {
+  // Finished round 1, round-2 pairing published → period 2, no round-2 card yet.
+  const field = [
+    withTee(player('Scottie Scheffler', [-3], GOLFERS.scheffler.id), TEE, 2),
+    player('Rory McIlroy', [-1], GOLFERS.mcilroy.id),
+  ];
+  const s = computeStandings(board(field)).scorecards.find((g) => g.id === GOLFERS.scheffler.id);
+  assert.equal(s.state, 'round-done');
+  assert.equal(s.teeTime, TEE, 'the tee time for the round they are yet to start');
+});
+
+check('a missed-cut golfer shows no tee time even if the feed still carries one', () => {
+  const field = [
+    withTee(player('Rory McIlroy', [4, 4], GOLFERS.mcilroy.id), TEE, 3), // cut, stale next tee
+    player('Scottie Scheffler', [-2, -2, -2], GOLFERS.scheffler.id), // survived → cut decided
+  ];
+  const { scorecards, golferBoard } = computeStandings(board(field));
+  assert.ok(scorecards.find((g) => g.id === GOLFERS.mcilroy.id).teeTime == null, 'no tee on the card');
+  assert.ok(golferBoard.find((g) => g.id === GOLFERS.mcilroy.id).teeTime == null, 'none on the board');
+});
+
+check('with no period in the feed, a completed round still yields the next tee', () => {
+  const field = [
+    withTee(player('Scottie Scheffler', [-3], GOLFERS.scheffler.id), TEE, null),
+    player('Rory McIlroy', [-1], GOLFERS.mcilroy.id),
+  ];
+  const s = computeStandings(board(field)).scorecards.find((g) => g.id === GOLFERS.scheffler.id);
+  assert.equal(s.teeTime, TEE);
+});
+
+check('with no period in the feed, a mid-round golfer has no tee time', () => {
+  const field = [withTee(player('Scottie Scheffler', [-2], GOLFERS.scheffler.id, 9), TEE, null)];
+  const s = computeStandings(board(field)).scorecards.find((g) => g.id === GOLFERS.scheffler.id);
+  assert.ok(s.teeTime == null);
+});
+
+check('an unparseable or absent tee time is ignored, never rendered', () => {
+  const bad = Object.values(GOLFERS).map((g) => withTee(player(g.name, [], g.id), 'not-a-date', 1));
+  assert.ok(computeStandings(board(bad, { started: false })).golferBoard.every((g) => g.teeTime == null));
+
+  const none = Object.values(GOLFERS).map((g) => player(g.name, [], g.id)); // no teeTime field at all
+  assert.ok(computeStandings(board(none, { started: false })).golferBoard.every((g) => g.teeTime == null));
+});
+
+// ---------------------------------------------------------------------------
+
 group('real ESPN data — 2026 Genesis Scottish Open (completed, real cut)');
 
 const toPar = (d) => (d === 'E' ? 0 : Number(String(d).replace('+', '')));
