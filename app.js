@@ -642,51 +642,42 @@ async function runDebug() {
   pre.textContent = 'debug: fetching ESPN…';
   document.querySelector('main')?.prepend(pre);
 
-  const scan = (obj) => {
+  // Scan an entire response for any key mentioning "tee", returning path=value.
+  const scanTee = (obj, max = 6) => {
     const hits = [];
     (function walk(o, path) {
-      if (o && typeof o === 'object') {
-        for (const k in o) {
-          if (/tee|time|date|start|clock|thru/i.test(k)) {
-            hits.push(`  ${path}${k} = ${String(JSON.stringify(o[k])).slice(0, 90)}`);
-          }
-          walk(o[k], `${path}${k}.`);
-        }
+      if (hits.length >= max || !o || typeof o !== 'object') return;
+      for (const k in o) {
+        if (/tee/i.test(k)) hits.push(`${path}${k} = ${String(JSON.stringify(o[k])).slice(0, 70)}`);
+        walk(o[k], `${path}${k}.`);
       }
     })(obj, '');
     return hits;
   };
 
-  try {
-    const { EVENT } = await import(`./config.js${V}`);
-    const out = [];
+  const base = 'https://site.api.espn.com/apis/site/v2/sports/golf/pga';
+  const candidates = [
+    ['scoreboard?dates', `${base}/scoreboard?dates=${'DATE'}`],
+    ['leaderboard', `${base}/leaderboard`],
+    ['leaderboard?event', `${base}/leaderboard?event=${'ID'}`],
+    ['summary?event', `${base}/summary?event=${'ID'}`],
+  ];
 
-    // Probe the /leaderboard endpoint, which carries per-golfer status (the
-    // /scoreboard endpoint the app fetches does not). Confirm where the tee time
-    // lives before wiring it in.
-    const url = `https://site.api.espn.com/apis/site/v2/sports/golf/pga/leaderboard?dates=${EVENT.date}`;
-    const res = await fetch(url, { cache: 'no-store' });
-    const data = await res.json();
-    out.push(`endpoint: /leaderboard?dates=${EVENT.date}`);
-    out.push(`top-level keys: ${Object.keys(data).join(', ')}`);
-
-    const ev =
-      (data.events || []).find((e) => e.id === EVENT.id) || (data.events || [])[0];
-    const comp = ev?.competitions?.[0] || {};
-    const comps = comp.competitors || [];
-    out.push(`event: ${ev?.name} | state: ${ev?.status?.type?.name} | competitors: ${comps.length}`);
-
-    for (const c of comps.slice(0, 3)) {
-      out.push('');
-      out.push(`# ${c.athlete?.displayName ?? '?'}`);
-      out.push(`competitor keys: ${Object.keys(c).join(', ')}`);
-      out.push(`status = ${JSON.stringify(c.status)}`);
-      const hits = scan(c);
-      out.push(hits.length ? `tee/time fields:\n${hits.join('\n')}` : 'tee/time fields: (none)');
+  const { EVENT } = await import(`./config.js${V}`);
+  const out = [];
+  for (const [label, tmpl] of candidates) {
+    const url = tmpl.replace('DATE', EVENT.date).replace('ID', EVENT.id);
+    out.push(`\n=== ${label} ===`);
+    try {
+      const res = await fetch(url, { cache: 'no-store' });
+      const data = await res.json();
+      out.push(`keys: ${Object.keys(data).join(', ')}`);
+      const hits = scanTee(data);
+      out.push(hits.length ? hits.join('\n') : "(no 'tee' field anywhere)");
+    } catch (e) {
+      out.push(`fetch failed: ${e.message}`);
     }
-    pre.textContent = out.join('\n');
-  } catch (e) {
-    pre.textContent = `debug fetch failed: ${e.message}`;
+    pre.textContent = out.join('\n'); // paint progressively
   }
 }
 
