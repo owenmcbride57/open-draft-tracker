@@ -1,10 +1,27 @@
 // Inherit the version we were loaded at (see index.html) so config.js can't be
 // served from a different cache generation than this file.
-const { EVENT, GOLFERS, ENTRIES, CUT_SIZE, TOURNAMENT_ROUNDS } = await import(
+const { EVENT, GOLFERS, ENTRIES, CUT_SIZE, TOURNAMENT_ROUNDS, TEE_TIMES } = await import(
   `./config.js${new URL(import.meta.url).search}`
 );
 
 const SCOREBOARD = 'https://site.api.espn.com/apis/site/v2/sports/golf/pga/scoreboard';
+
+// ESPN keys everyone by athlete id; our hand-entered tee times are keyed by
+// golfer key (scheffler, mcilroy, …). This maps one to the other.
+const ID_TO_KEY = new Map(Object.entries(GOLFERS).map(([key, g]) => [g.id, key]));
+
+// The round a golfer is waiting to start — the one a tee time would be for.
+// No rounds yet → round 1. A finished round → the next one. Otherwise the round
+// they're on (which upcomingTee treats as "started" once a hole is posted). ESPN
+// often opens the next round as a placeholder (a score, zero holes) before the
+// player tees off, which this handles: that round is still the one they're about
+// to play.
+function upcomingRound(rounds, holes) {
+  const nums = Object.keys(rounds).map(Number);
+  if (nums.length === 0) return 1;
+  const cur = Math.max(...nums);
+  return (holes[cur] ?? 0) >= HOLES ? cur + 1 : cur;
+}
 
 // ESPN reports every score relative to par as a display string: "E", "-5", "+8".
 function toPar(displayValue) {
@@ -21,7 +38,7 @@ export function formatToPar(n) {
   return n > 0 ? `+${n}` : `${n}`;
 }
 
-export async function fetchLeaderboard({ demo = false } = {}) {
+export async function fetchLeaderboard({ demo = false, teeTimes = TEE_TIMES } = {}) {
   // Demo mode replays a real completed tournament (the 2026 Scottish Open, which
   // had a genuine 36-hole cut) with our golfers' ids grafted onto real
   // scorelines, so the league can see how the finished board will look before a
@@ -81,12 +98,14 @@ export async function fetchLeaderboard({ demo = false } = {}) {
       cards[ls.period] = perHole;
     }
 
-    // ESPN carries the tee time for the round the player is about to (or has
-    // just begun to) play on the competitor's status, alongside which round
-    // (period) it refers to. We keep the raw ISO instant — the browser turns it
-    // into the viewer's own local time at render — and never invent one: if the
-    // feed hasn't published the next round's pairings yet, teeTime is simply null.
-    const st = c.status || {};
+    // ESPN's feed has no tee times, so we take them from our hand-entered list
+    // (config's TEE_TIMES) keyed by the round the golfer is about to play. The
+    // raw ISO instant is kept as-is — the browser turns it into the viewer's own
+    // local time at render — and it's only ever set for one of our golfers who
+    // has a time on file; everyone else's is null.
+    const key = ID_TO_KEY.get(c.id);
+    const teePeriod = upcomingRound(rounds, holes);
+    const teeTime = key ? (teeTimes?.[teePeriod]?.[key] ?? null) : null;
 
     return {
       id: c.id,
@@ -96,8 +115,8 @@ export async function fetchLeaderboard({ demo = false } = {}) {
       cards,
       roundsPlayed: Object.keys(rounds).length,
       total: toPar(c.score),
-      teeTime: st.teeTime ?? null,
-      teePeriod: st.period ?? null,
+      teeTime,
+      teePeriod,
     };
   });
 
@@ -219,15 +238,15 @@ function missedCut(player, cut) {
 
 // The tee time for a golfer's *upcoming* round — but only while they genuinely
 // have not started it. Returns the raw ISO instant (formatted into the viewer's
-// local time by the render layer) or null.
+// local time by the render layer) or null. The time and the round it's for
+// (teeTime / teePeriod) are attached in fetchLeaderboard from the hand-entered
+// TEE_TIMES list; here we decide whether to actually surface it.
 //
-// "Not started their next round" is read off the feed rather than guessed: the
-// tee time is stamped with the round (period) it belongs to, so if the golfer
-// already has a card for that round they're mid-play — nothing to count down to.
-// Before the tournament this is their round-1 tee; between rounds it becomes the
-// next round's tee the moment ESPN publishes the pairing, and until then it's
-// null. A golfer who has finished the tournament, or missed the cut, has no next
-// round and so no upcoming tee.
+// It shows only while the golfer hasn't teed off that round: once they post a
+// hole in it, ESPN's score clears the chip. Before the tournament this is their
+// round-1 tee; between rounds it's the next round's tee once you've entered it,
+// and null until then. A golfer who has finished the tournament, or missed the
+// cut, has no next round and so no upcoming tee.
 function upcomingTee(player, cut) {
   const iso = player.teeTime;
   if (!iso || !Number.isFinite(Date.parse(iso))) return null;

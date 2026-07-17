@@ -85,22 +85,34 @@ button moves between tabs.
 ### Tee times for upcoming rounds
 
 Any golfer who has **not yet started their next round** shows a ⛳ tee-time chip —
-on the draft board, the leaderboard and the scorecards. Before Thursday that's
-their round-1 tee; between rounds it becomes the next round's tee the moment ESPN
-publishes the pairing, and until then there's nothing to show. A golfer who is
-mid-round, has finished the tournament, or missed the cut has no upcoming round,
-so no chip. ESPN stamps each tee time with the round it belongs to, so "has not
-started it" is read straight off the feed rather than guessed. The chip stays up
-until the golfer has actually **played a hole** — a placeholder round score ESPN
-can hang on a player at the tee doesn't drop it early, so it lasts until the tee
-genuinely occurs.
+on the draft board, the leaderboard and the scorecards. A golfer who is mid-round,
+has finished the tournament, or missed the cut has no upcoming round, so no chip.
+The chip stays up until the golfer has actually **played a hole** — a placeholder
+round score ESPN can hang on a player at the tee doesn't drop it early, so it
+lasts until the tee genuinely occurs, then clears itself.
+
+**Tee times are entered by hand**, in `config.js`'s `TEE_TIMES`. This is not a
+choice — ESPN's public feed simply does not carry them (verified against every
+reachable endpoint: the scoreboard has scores and hole-by-hole cards but no tee
+times or pairings, and the other endpoints return errors). The Open posts the
+next round's tee times the evening before; paste them in, keyed by round and
+golfer:
+
+```js
+export const TEE_TIMES = {
+  2: { scheffler: '2026-07-17T13:40Z', mcilroy: '2026-07-17T09:15Z' },
+};
+```
+
+Use a UTC instant (trailing `Z`). You only ever add the next round's block — once
+a golfer tees off, their live score clears the chip on its own, so old entries
+look after themselves. Leaving `TEE_TIMES` empty simply means no chips.
 
 The time is rendered in **the viewer's own local timezone** — the browser knows
 where you are, so a manager in California sees Pacific and one in Scotland sees
 BST from the same shared instant, each with the zone spelled out (e.g.
 `⛳ 9:15 AM BST`) so a screenshot is never ambiguous. The weekday is added when the
-tee isn't today. If the feed hasn't published a tee time yet, the chip simply
-doesn't appear — none is ever invented.
+tee isn't today.
 
 ### What the Scorecards tab can and cannot show
 

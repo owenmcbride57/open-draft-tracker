@@ -633,9 +633,10 @@ check('formatToPar renders E, minus and plus', () => {
 
 group('tee times');
 
-// ESPN stamps a tee time on the competitor status along with the round (period)
-// it belongs to. We keep it as a raw ISO instant on the field player; scoring
-// only surfaces it while the golfer genuinely hasn't started that round.
+// Tee times are hand-entered (config's TEE_TIMES) and attached to the field
+// player as teeTime + the round they're for (teePeriod). These checks exercise
+// the surfacing logic directly by setting those two fields on a player; a
+// separate group below covers pulling them out of the config in fetchLeaderboard.
 const TEE = '2026-07-16T09:15Z';
 const withTee = (p, teeTime, teePeriod) => ({ ...p, teeTime, teePeriod });
 
@@ -711,6 +712,70 @@ check('an unparseable or absent tee time is ignored, never rendered', () => {
   const none = Object.values(GOLFERS).map((g) => player(g.name, [], g.id)); // no teeTime field at all
   assert.ok(computeStandings(board(none, { started: false })).golferBoard.every((g) => g.teeTime == null));
 });
+
+// ---------------------------------------------------------------------------
+
+group('tee times from config');
+
+// The times come from config's TEE_TIMES, keyed by the round a golfer is about
+// to play. fetchLeaderboard attaches the right one to each golfer; these checks
+// stub the feed and confirm it picks the upcoming round and respects play state.
+{
+  const fmtP = (v) => (v === 0 ? 'E' : v > 0 ? `+${v}` : `${v}`);
+  const holeCard = (n, s) =>
+    Array.from({ length: n }, (_, k) => ({ period: k + 1, value: 4, scoreType: { displayValue: k === 0 ? fmtP(s) : 'E' } }));
+  // roundScores is one entry per round; holesLast leaves the final round partway.
+  const makeComp = (gid, name, roundScores, holesLast = 18) => ({
+    id: gid,
+    athlete: { id: gid, displayName: name },
+    score: fmtP(roundScores.reduce((a, b) => a + b, 0)),
+    linescores: roundScores.map((s, i) =>
+      ({ period: i + 1, displayValue: fmtP(s), linescores: holeCard(i === roundScores.length - 1 ? holesLast : 18, s) })),
+  });
+  const eventWith = (competitors) => ({
+    id: EVENT.id,
+    name: EVENT.name,
+    date: '2026-07-17T06:00Z',
+    status: { type: { name: 'STATUS_IN_PROGRESS', completed: false }, completed: false },
+    competitions: [{ competitors }],
+  });
+  const withStubbedFeed = async (competitors, opts) => {
+    const realFetch = globalThis.fetch;
+    globalThis.fetch = async () => ({ ok: true, json: async () => ({ events: [eventWith(competitors)] }) });
+    try {
+      return await fetchLeaderboard(opts);
+    } finally {
+      globalThis.fetch = realFetch;
+    }
+  };
+
+  const times = { 1: { scheffler: '2026-07-16T06:35Z' }, 2: { scheffler: '2026-07-17T13:40Z' } };
+
+  // Round 1 complete, not yet out for round 2 → the round-2 tee, from config.
+  const between = await withStubbedFeed([makeComp(GOLFERS.scheffler.id, 'Scottie Scheffler', [-3])], { teeTimes: times });
+  check('a between-rounds golfer gets the next round tee from config', () => {
+    const p = between.field.find((x) => x.id === GOLFERS.scheffler.id);
+    assert.equal(p.teePeriod, 2, 'the upcoming round is 2');
+    assert.equal(p.teeTime, '2026-07-17T13:40Z', 'pulled from TEE_TIMES[2]');
+    const card = computeStandings(between).scorecards.find((g) => g.id === GOLFERS.scheffler.id);
+    assert.equal(card.teeTime, '2026-07-17T13:40Z', 'and it surfaces on the scorecard');
+  });
+
+  // Out on the course in round 2 (9 holes in) → no upcoming tee.
+  const playing = await withStubbedFeed([makeComp(GOLFERS.scheffler.id, 'Scottie Scheffler', [-3, -1], 9)], { teeTimes: times });
+  check('a golfer already underway shows no tee, even with a time on file', () => {
+    const card = computeStandings(playing).scorecards.find((g) => g.id === GOLFERS.scheffler.id);
+    assert.ok(card.teeTime == null, 'a started round has no upcoming tee');
+  });
+
+  // A time on file for a golfer, but the wrong round → nothing surfaces.
+  const noEntry = await withStubbedFeed([makeComp(GOLFERS.scheffler.id, 'Scottie Scheffler', [-3])], { teeTimes: { 1: times[1] } });
+  check('no config entry for the upcoming round means no chip', () => {
+    const p = noEntry.field.find((x) => x.id === GOLFERS.scheffler.id);
+    assert.equal(p.teePeriod, 2, 'upcoming round is 2');
+    assert.ok(p.teeTime == null, 'only round 1 is on file, so round 2 is null');
+  });
+}
 
 // ---------------------------------------------------------------------------
 

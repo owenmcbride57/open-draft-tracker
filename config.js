@@ -45,6 +45,27 @@ export const ENTRIES = [
   { manager: 'Coop',                     picks: ['scheffler', 'fitzpatrick', 'hovland'],   prediction: -15 },
 ];
 
+// Tee times for upcoming rounds — entered by hand, because ESPN's public feed
+// does not carry them (its scoreboard has scores and hole-by-hole cards, but no
+// tee times or pairings). The Open posts the next round's tee times the evening
+// before; paste them here and the ⛳ chip appears on the board.
+//
+// Shape: TEE_TIMES[round][golferKey] = an ISO instant in UTC (note the trailing
+// "Z"). The app renders it in each viewer's own local time, and only shows it
+// until that golfer actually tees off the round — once they post a hole ESPN's
+// score clears the chip automatically, so stale entries look after themselves.
+// You only ever add the next round's block; old rounds can stay or be deleted.
+//
+// Golfer keys are the ones in GOLFERS above (scheffler, mcilroy, young, …).
+// Example — Friday's second round:
+//   2: {
+//     scheffler: '2026-07-17T13:40Z',
+//     mcilroy:   '2026-07-17T09:15Z',
+//   },
+export const TEE_TIMES = {
+  // round: { golferKey: 'YYYY-MM-DDTHH:MMZ', … }
+};
+
 // How often to re-pull the leaderboard, in seconds.
 export const REFRESH_SECONDS = 60;
 
