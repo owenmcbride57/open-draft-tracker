@@ -91,22 +91,23 @@ The chip stays up until the golfer has actually **played a hole** — a placehol
 round score ESPN can hang on a player at the tee doesn't drop it early, so it
 lasts until the tee genuinely occurs, then clears itself.
 
-**Tee times are entered by hand**, in `config.js`'s `TEE_TIMES`. This is not a
-choice — ESPN's public feed simply does not carry them (verified against every
-reachable endpoint: the scoreboard has scores and hole-by-hole cards but no tee
-times or pairings, and the other endpoints return errors). The Open posts the
-next round's tee times the evening before; paste them in, keyed by round and
-golfer:
+**Tee times are fetched automatically** — no manual entry. ESPN's public
+scoreboard (the feed the site itself reads) carries no tee times, but ESPN's
+deeper *core* API does, on each competitor's status. That API sends no CORS
+headers, so the browser can't read it directly; instead a scheduled GitHub
+Action (`.github/workflows/tee-times.yml`) runs `scripts/fetch-tee-times.mjs`
+every 15 minutes, pulls the upcoming-round tee time for each drafted golfer, and
+commits `tee-times.json`. The site fetches that file and shows the chips.
 
-```js
-export const TEE_TIMES = {
-  2: { scheffler: '2026-07-17T13:40Z', mcilroy: '2026-07-17T09:15Z' },
-};
+```
+tee-times.json → { "event": "401811957", "rounds": { "2": { "scheffler": "…Z" } } }
 ```
 
-Use a UTC instant (trailing `Z`). You only ever add the next round's block — once
-a golfer tees off, their live score clears the chip on its own, so old entries
-look after themselves. Leaving `TEE_TIMES` empty simply means no chips.
+`config.js` still has a `TEE_TIMES` map as a manual fallback/override — normally
+empty, but anything you put there is used when `tee-times.json` can't be loaded.
+The Action can be paused any time (Actions tab → tee-times → disable); the site
+keeps working, just without new tee times. It only commits when a time actually
+changes, so it doesn't spam the history.
 
 The time is rendered in **the viewer's own local timezone** — the browser knows
 where you are, so a manager in California sees Pacific and one in Scotland sees

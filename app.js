@@ -597,6 +597,22 @@ function paintFreshness() {
   else refreshEl.textContent = `Updated ${Math.round(secs / 60)} min ago`;
 }
 
+// Tee times come from tee-times.json, refreshed by a scheduled GitHub Action
+// (ESPN's public feed has none; the Action pulls them from the core API server-
+// side and commits them here). It's just data, so we cache-bust by timestamp.
+// A miss — file not there yet, network blip, bad JSON — falls back to whatever
+// config ships, so the board never breaks over a tee time.
+async function loadTeeTimes() {
+  try {
+    const res = await fetch(`./tee-times.json?t=${Date.now()}`, { cache: 'no-store' });
+    if (!res.ok) return undefined;
+    const data = await res.json();
+    return data?.rounds ?? undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 async function tick() {
   if (inFlight) return;
   inFlight = true;
@@ -604,7 +620,8 @@ async function tick() {
   paintFreshness();
 
   try {
-    const board = await fetchLeaderboard({ demo: DEMO });
+    const teeTimes = await loadTeeTimes();
+    const board = await fetchLeaderboard({ demo: DEMO, teeTimes });
     inFlight = false;
     render(board, computeStandings(board));
     errorEl.hidden = true;

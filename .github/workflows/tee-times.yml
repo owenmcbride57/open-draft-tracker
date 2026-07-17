@@ -1,0 +1,38 @@
+name: tee-times
+
+# Pulls upcoming-round tee times from ESPN's core API (which the static site
+# can't reach directly) and commits tee-times.json for the site to read.
+on:
+  schedule:
+    - cron: '3/15 * * * *' # every 15 minutes
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: tee-times
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch tee times
+        run: node scripts/fetch-tee-times.mjs
+
+      - name: Commit if changed
+        run: |
+          if git diff --quiet -- tee-times.json; then
+            echo "No change to tee-times.json."
+            exit 0
+          fi
+          git config user.name "tee-times-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add tee-times.json
+          git commit -m "Update tee times"
+          # Land on top of any manual pushes rather than failing the run.
+          git pull --rebase --autostash origin main
+          git push
