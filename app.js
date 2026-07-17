@@ -626,3 +626,56 @@ tick();
 setInterval(tick, REFRESH_SECONDS * 1000);
 // Tick the "updated Xs ago" label independently of the network poll.
 setInterval(paintFreshness, 1000);
+
+// ---------------------------------------------------------------------------
+// ?debug — a hidden diagnostic. Dumps the raw ESPN competitor `status` for the
+// first few golfers and scans each competitor for any tee/time/date field, so we
+// can see exactly where (if anywhere) the feed carries a tee time. Only renders
+// when ?debug is in the URL, so the league's normal view is untouched.
+// ---------------------------------------------------------------------------
+async function runDebug() {
+  const pre = document.createElement('pre');
+  pre.style.cssText =
+    'white-space:pre-wrap;word-break:break-word;margin:1rem;padding:1rem;' +
+    'background:#0b1a14;border:1px solid #234436;border-radius:8px;color:#eaf3ee;' +
+    'font:12px/1.5 ui-monospace,Menlo,Consolas,monospace;';
+  pre.textContent = 'debug: fetching ESPN…';
+  document.querySelector('main')?.prepend(pre);
+
+  try {
+    const { EVENT } = await import(`./config.js${V}`);
+    const url = `https://site.api.espn.com/apis/site/v2/sports/golf/pga/scoreboard?dates=${EVENT.date}`;
+    const res = await fetch(url, { cache: 'no-store' });
+    const data = await res.json();
+    const ev =
+      (data.events || []).find((e) => e.id === EVENT.id) || (data.events || [])[0];
+    const comps = ev?.competitions?.[0]?.competitors || [];
+
+    const out = [];
+    out.push(`endpoint: /scoreboard?dates=${EVENT.date}`);
+    out.push(`event: ${ev?.name} | state: ${ev?.status?.type?.name} | competitors: ${comps.length}`);
+
+    for (const c of comps.slice(0, 4)) {
+      out.push('');
+      out.push(`# ${c.athlete?.displayName ?? '?'}`);
+      out.push(`status = ${JSON.stringify(c.status)}`);
+      const hits = [];
+      (function walk(o, path) {
+        if (o && typeof o === 'object') {
+          for (const k in o) {
+            if (/tee|time|date|start|clock/i.test(k)) {
+              hits.push(`  ${path}${k} = ${String(JSON.stringify(o[k])).slice(0, 90)}`);
+            }
+            walk(o[k], `${path}${k}.`);
+          }
+        }
+      })(c, '');
+      out.push(hits.length ? `tee/time/date fields:\n${hits.join('\n')}` : 'tee/time/date fields: (none)');
+    }
+    pre.textContent = out.join('\n');
+  } catch (e) {
+    pre.textContent = `debug fetch failed: ${e.message}`;
+  }
+}
+
+if (new URLSearchParams(location.search).has('debug')) runDebug();
