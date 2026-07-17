@@ -89,6 +89,13 @@ function teeTag(iso) {
     : '';
 }
 
+// A red badge marking a golfer we've confirmed missed the cut. Only shown once
+// the cut is decided (round 3+), never as a projection, and placed next to the
+// name for a consistent at-a-glance signal on every page.
+function cutBadge(missed) {
+  return missed ? '<span class="badge cut" title="Missed the cut">MC</span>' : '';
+}
+
 function roundCells(golfer, roundsStarted) {
   const cells = [];
   for (let r = 1; r <= 4; r++) {
@@ -167,9 +174,8 @@ function golferRow(golfer, roundsStarted) {
     </li>`;
   }
 
-  const badge = golfer.cut ? '<span class="badge cut">MC</span>' : '';
   return `<li class="golfer${golfer.cut ? ' is-cut' : ''}">
-    <span class="golfer-name">${golfer.name}${badge}${holeIndicator(golfer)}</span>
+    <span class="golfer-name">${golfer.name}${cutBadge(golfer.cut)}${holeIndicator(golfer)}</span>
     <span class="rounds">${roundCells(golfer, roundsStarted)}</span>
     <span class="golfer-total">${formatToPar(golfer.total)}</span>
   </li>`;
@@ -397,7 +403,7 @@ function renderGolferBoard({ cut, golferBoard, roundsStarted, winningScore, lead
 
     return `<li class="golfer-row ${standing}${crown ? ' is-leader' : ''}">
       ${pos}
-      <span class="g-name">${avatar(g)}${g.name}${crown}${teeTag(g.teeTime)}</span>
+      <span class="g-name">${avatar(g)}${g.name}${crown}${cutBadge(g.madeCut === false)}${teeTag(g.teeTime)}</span>
       <span class="g-owners"><span class="count">${g.owners.length}×</span> ${g.owners.join(', ')}</span>
       <span class="g-rounds">${rounds(g)}</span>
       ${margin}
@@ -500,7 +506,7 @@ function renderScorecards({ scorecards = [], roundsStarted }) {
       return `<li class="scorecard ${g.state}">
         <div class="sc-head">
           ${pos}
-          <span class="sc-name">${avatar(g)}${g.name}${teeTag(g.teeTime)}</span>
+          <span class="sc-name">${avatar(g)}${g.name}${cutBadge(g.state === 'cut')}${teeTag(g.teeTime)}</span>
           <span class="sc-owners">${g.owners.join(', ')}</span>
           ${today}
           ${thru}

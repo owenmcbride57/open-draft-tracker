@@ -473,6 +473,24 @@ check('a cut golfer is marked CUT and carries no live round', () => {
   assert.equal(scottie.position, '1', 'the survivor is ranked, and the cut player is not in the pool');
 });
 
+check('a confirmed missed cut is flagged for the MC badge on every view', () => {
+  // The badge keys off madeCut===false (leaderboard) and state==='cut'
+  // (scorecards); a survivor must not trip either, and neither must fire before
+  // the cut is decided.
+  const decided = [
+    player('Rory McIlroy', [5, 5], GOLFERS.mcilroy.id), // no round 3 -> cut
+    player('Scottie Scheffler', [-2, -2, -2], GOLFERS.scheffler.id), // survived
+  ];
+  const d = computeStandings(board(decided));
+  assert.equal(d.golferBoard.find((g) => g.id === GOLFERS.mcilroy.id).madeCut, false, 'cut golfer flagged');
+  assert.equal(d.golferBoard.find((g) => g.id === GOLFERS.scheffler.id).madeCut, true, 'survivor not flagged');
+  assert.equal(d.scorecards.find((g) => g.id === GOLFERS.mcilroy.id).state, 'cut', 'scorecard shows cut');
+
+  // Rounds 1-2 only: the cut is not decided, so nobody is flagged yet.
+  const early = computeStandings(board([player('Rory McIlroy', [5, 5], GOLFERS.mcilroy.id)]));
+  assert.equal(early.golferBoard.find((g) => g.id === GOLFERS.mcilroy.id).madeCut, null, 'no flag before the cut is decided');
+});
+
 check('a golfer who has not teed off shows no position or card', () => {
   const field = Object.values(GOLFERS).map((g) => player(g.name, [], g.id));
   const { scorecards } = computeStandings(board(field, { started: false }));
