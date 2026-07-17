@@ -642,35 +642,47 @@ async function runDebug() {
   pre.textContent = 'debug: fetching ESPN…';
   document.querySelector('main')?.prepend(pre);
 
+  const scan = (obj) => {
+    const hits = [];
+    (function walk(o, path) {
+      if (o && typeof o === 'object') {
+        for (const k in o) {
+          if (/tee|time|date|start|clock|thru/i.test(k)) {
+            hits.push(`  ${path}${k} = ${String(JSON.stringify(o[k])).slice(0, 90)}`);
+          }
+          walk(o[k], `${path}${k}.`);
+        }
+      }
+    })(obj, '');
+    return hits;
+  };
+
   try {
     const { EVENT } = await import(`./config.js${V}`);
-    const url = `https://site.api.espn.com/apis/site/v2/sports/golf/pga/scoreboard?dates=${EVENT.date}`;
+    const out = [];
+
+    // Probe the /leaderboard endpoint, which carries per-golfer status (the
+    // /scoreboard endpoint the app fetches does not). Confirm where the tee time
+    // lives before wiring it in.
+    const url = `https://site.api.espn.com/apis/site/v2/sports/golf/pga/leaderboard?dates=${EVENT.date}`;
     const res = await fetch(url, { cache: 'no-store' });
     const data = await res.json();
+    out.push(`endpoint: /leaderboard?dates=${EVENT.date}`);
+    out.push(`top-level keys: ${Object.keys(data).join(', ')}`);
+
     const ev =
       (data.events || []).find((e) => e.id === EVENT.id) || (data.events || [])[0];
-    const comps = ev?.competitions?.[0]?.competitors || [];
-
-    const out = [];
-    out.push(`endpoint: /scoreboard?dates=${EVENT.date}`);
+    const comp = ev?.competitions?.[0] || {};
+    const comps = comp.competitors || [];
     out.push(`event: ${ev?.name} | state: ${ev?.status?.type?.name} | competitors: ${comps.length}`);
 
-    for (const c of comps.slice(0, 4)) {
+    for (const c of comps.slice(0, 3)) {
       out.push('');
       out.push(`# ${c.athlete?.displayName ?? '?'}`);
+      out.push(`competitor keys: ${Object.keys(c).join(', ')}`);
       out.push(`status = ${JSON.stringify(c.status)}`);
-      const hits = [];
-      (function walk(o, path) {
-        if (o && typeof o === 'object') {
-          for (const k in o) {
-            if (/tee|time|date|start|clock/i.test(k)) {
-              hits.push(`  ${path}${k} = ${String(JSON.stringify(o[k])).slice(0, 90)}`);
-            }
-            walk(o[k], `${path}${k}.`);
-          }
-        }
-      })(c, '');
-      out.push(hits.length ? `tee/time/date fields:\n${hits.join('\n')}` : 'tee/time/date fields: (none)');
+      const hits = scan(c);
+      out.push(hits.length ? `tee/time fields:\n${hits.join('\n')}` : 'tee/time fields: (none)');
     }
     pre.textContent = out.join('\n');
   } catch (e) {
