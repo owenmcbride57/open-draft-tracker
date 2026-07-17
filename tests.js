@@ -1,7 +1,7 @@
 // Verifies the scoring rules against both synthetic cases and real ESPN data.
 // Open tests.html in a browser to run.
-import { GOLFERS, ENTRIES } from './config.js';
-import { computeStandings, formatToPar } from './scoring.js';
+import { EVENT, GOLFERS, ENTRIES } from './config.js';
+import { fetchLeaderboard, computeStandings, formatToPar } from './scoring.js';
 
 const out = document.getElementById('out');
 let passed = 0;
@@ -701,6 +701,84 @@ check('an unparseable or absent tee time is ignored, never rendered', () => {
   const none = Object.values(GOLFERS).map((g) => player(g.name, [], g.id)); // no teeTime field at all
   assert.ok(computeStandings(board(none, { started: false })).golferBoard.every((g) => g.teeTime == null));
 });
+
+// ---------------------------------------------------------------------------
+
+group('playoff contingency');
+
+// A tie for the win is settled by a playoff, which ESPN reports as a 5th round on
+// the golfers involved. Those extra holes decide the trophy, not the fantasy
+// score, so they must never be added to a golfer's total nor penalise the field.
+// Stub fetch with a playoff event and drive the real ingestion path.
+{
+  const fmtP = (v) => (v === 0 ? 'E' : v > 0 ? `+${v}` : `${v}`);
+  const holeCard = (n, s) =>
+    Array.from({ length: n }, (_, k) => ({ period: k + 1, value: 4, scoreType: { displayValue: k === 0 ? fmtP(s) : 'E' } }));
+  const roundLS = (period, s, holes) => ({ period, displayValue: fmtP(s), linescores: holeCard(holes, s) });
+  const makeComp = (gid, name, roundScores, totalDisplay, playoffScore = null) => {
+    const linescores = roundScores.map((s, i) => roundLS(i + 1, s, 18));
+    if (playoffScore != null) linescores.push(roundLS(5, playoffScore, 4)); // 4 extra holes
+    return {
+      id: gid,
+      athlete: { id: gid, displayName: name },
+      score: totalDisplay, // ESPN's own to-par, which already excludes playoff strokes
+      linescores,
+      status: {
+        type: { name: 'STATUS_IN_PROGRESS' },
+        period: playoffScore != null ? 5 : 4,
+        teeTime: playoffScore != null ? '2026-07-19T18:30Z' : null,
+      },
+    };
+  };
+  const event = {
+    id: EVENT.id,
+    name: EVENT.name,
+    date: '2026-07-19T12:00Z',
+    status: { type: { name: 'STATUS_IN_PROGRESS', completed: false, detail: 'Playoff' }, completed: false },
+    competitions: [{
+      competitors: [
+        makeComp(GOLFERS.scheffler.id, 'Scottie Scheffler', [-3, -3, -3, -3], '-12', 4), // wins a playoff at +4
+        makeComp(GOLFERS.mcilroy.id, 'Rory McIlroy', [-3, -3, -3, -3], '-12'), // same 72-hole score, no playoff
+        makeComp(GOLFERS.fleetwood.id, 'Tommy Fleetwood', [-2, -2, -2, -2], '-8'),
+      ],
+    }],
+  };
+
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async () => ({ ok: true, json: async () => ({ events: [event] }) });
+  let pboard;
+  try {
+    pboard = await fetchLeaderboard({ demo: false });
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+  const pstd = computeStandings(pboard);
+  const golferTotal = (gid) => pstd.rows.flatMap((r) => r.golfers).find((g) => g.id === gid)?.total;
+
+  check('a 5th-round playoff score never enters the model', () => {
+    const w = pboard.field.find((p) => p.id === GOLFERS.scheffler.id);
+    assert.ok(w.rounds[5] === undefined, 'no round 5 in the model');
+    assert.equal(w.roundsPlayed, 4, 'only the four tournament rounds count');
+    assert.equal(pstd.roundsStarted, 4, 'roundsStarted stays at 4');
+    assert.equal(pstd.penalties[5], undefined, 'no round-5 penalty is ever computed');
+  });
+
+  check('a golfer dragged into a playoff is not charged its extra strokes', () => {
+    assert.equal(golferTotal(GOLFERS.scheffler.id), -12, 'the winner keeps -12, not -8');
+    assert.equal(golferTotal(GOLFERS.mcilroy.id), -12, 'the loser, same 72 holes, also -12');
+    assert.equal(
+      golferTotal(GOLFERS.scheffler.id),
+      golferTotal(GOLFERS.mcilroy.id),
+      'the playoff does not separate them on fantasy score',
+    );
+  });
+
+  check('the playoff is not surfaced as an upcoming tee time or a 5th-round card', () => {
+    const card = pstd.scorecards.find((g) => g.id === GOLFERS.scheffler.id);
+    assert.ok(card.teeTime == null, 'no playoff tee-time chip');
+    assert.equal(card.currentRound, 4, 'the card shows round 4, not a playoff round');
+  });
+}
 
 // ---------------------------------------------------------------------------
 

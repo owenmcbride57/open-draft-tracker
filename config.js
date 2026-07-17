@@ -51,3 +51,10 @@ export const REFRESH_SECONDS = 60;
 // The Open cuts to the top 70 and ties after 36 holes. The line therefore moves
 // all through Friday as the field posts scores — it is not a fixed number.
 export const CUT_SIZE = 70;
+
+// The championship is played over this many rounds. It matters because a tie for
+// the win is settled by a playoff — extra holes ESPN reports as further rounds
+// (period 5+). Those strokes decide the trophy, not the score: the fantasy total
+// is a 72-hole figure, so a golfer dragged into a playoff must be neither charged
+// nor credited for it. Anything beyond this round count is dropped as a playoff.
+export const TOURNAMENT_ROUNDS = 4;

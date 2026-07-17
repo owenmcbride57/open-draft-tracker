@@ -33,6 +33,23 @@ end-of-day batch job is needed: it converges by itself.
 - **Ties** are broken by whose **predicted winning score** is closest to the
   actual winning score.
 
+### A playoff never changes a golfer's score
+
+If two or more players tie for the win they go to a **playoff** — extra holes to
+decide the trophy. ESPN reports those holes as a further round (period 5+) on the
+golfers involved, and left alone that would wreck the fantasy maths two ways: the
+golfers *in* the playoff would have their extra-hole strokes added to their total
+(penalising them for tying for the win), and every golfer *not* in it could be
+charged a "missed round" penalty for a round they were never part of.
+
+The fantasy score is a **72-hole to-par figure**, so a playoff must not touch it
+at all. Any round beyond `TOURNAMENT_ROUNDS` (4) is therefore dropped the moment
+the feed is parsed — it never reaches the round count, the penalty maths, the
+totals or the scorecards. A golfer's overall to-par comes from ESPN's own `score`,
+which already excludes playoff strokes, so the two always agree. The winner and
+the runner-up finish level on fantasy score, exactly as they finished level over
+72 holes. `tests.js` pins this under "playoff contingency".
+
 ### Dead heats are deliberately left unresolved
 
 The tiebreaker can itself tie. Jack and Patrick John Kealy III both predicted −9,

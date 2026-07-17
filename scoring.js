@@ -1,6 +1,6 @@
 // Inherit the version we were loaded at (see index.html) so config.js can't be
 // served from a different cache generation than this file.
-const { EVENT, GOLFERS, ENTRIES, CUT_SIZE } = await import(
+const { EVENT, GOLFERS, ENTRIES, CUT_SIZE, TOURNAMENT_ROUNDS } = await import(
   `./config.js${new URL(import.meta.url).search}`
 );
 
@@ -51,6 +51,15 @@ export async function fetchLeaderboard({ demo = false } = {}) {
     const cards = {}; // round number -> [{ hole, strokes, result }] in hole order
 
     for (const ls of c.linescores || []) {
+      // A tie for the win is settled by a playoff, which ESPN reports as further
+      // rounds (period 5+). Those extra holes decide the trophy, not the score —
+      // the fantasy total is a 72-hole figure — so a golfer dragged into a playoff
+      // must be neither charged nor credited for it. Dropping the period here is
+      // the whole contingency: it never reaches roundsStarted, the penalty maths,
+      // the totals or the scorecards. (The golfer's overall to-par total comes
+      // from ESPN's own `score`, which already excludes playoff strokes.)
+      if (Number(ls.period) > TOURNAMENT_ROUNDS) continue;
+
       const par = toPar(ls.displayValue);
       if (par == null) continue;
       rounds[ls.period] = par;
@@ -225,6 +234,10 @@ function upcomingTee(player, cut) {
   if (missedCut(player, cut)) return null;
 
   const period = player.teePeriod;
+  // A tee time for a playoff (a period beyond the tournament's rounds) is not a
+  // "next round" the fantasy scoring recognises — the event is scored over its
+  // rounds only — so there is nothing upcoming to show.
+  if (period != null && period > TOURNAMENT_ROUNDS) return null;
   if (period != null) {
     // They've begun the round the tee time is for → it's not upcoming.
     const begun = player.rounds[period] != null || (player.holes?.[period] ?? 0) > 0;
