@@ -164,15 +164,26 @@ function applyDemoIdentities(event) {
 
 const HOLES = 18;
 
-// Is anyone still out on the course — a round begun but not finished? Lets us tell
-// "round 2 is still being played" (the cut is a projection) from "round 2 is
-// complete" (the cut is final) without waiting for round 3 to start.
-function anyoneMidRound(field) {
-  return field.some((p) => {
-    if (p.roundsPlayed === 0) return false;
-    const cur = Math.max(...Object.keys(p.rounds).map(Number));
-    return (p.holes?.[cur] ?? 0) < HOLES;
+// Has round 2 finished across the field? Used to tell "round 2 is still being
+// played" (the cut is a projection) from "round 2 is complete" (the cut is final)
+// without waiting for round 3 to start.
+//
+// Two conditions: nobody is *actively* out on the course (a second round 1-17
+// holes in), and all but a handful of starters have a finished second round. The
+// handful matters — a withdrawal can sit in the feed forever showing "R2 thru 0",
+// and one such player must not hold the cut open once everyone else is done.
+function roundTwoComplete(field) {
+  const started = field.filter((p) => p.rounds[1] != null);
+  if (started.length === 0) return false;
+
+  const activelyPlaying = field.some((p) => {
+    const h = p.holes?.[2] ?? 0;
+    return h > 0 && h < HOLES; // genuinely mid-second-round, not a "thru 0" no-show
   });
+  if (activelyPlaying) return false;
+
+  const doneR2 = started.filter((p) => (p.holes?.[2] ?? 0) >= HOLES).length;
+  return doneR2 >= started.length * 0.9;
 }
 
 // Where the cut currently sits, and whether it's final.
@@ -208,7 +219,7 @@ function computeCut(field, roundsStarted) {
 
   const line = totals[Math.min(CUT_SIZE - 1, totals.length - 1)];
   // Decided as soon as the whole field has posted its 36 holes.
-  const decided = roundsStarted === 2 && !anyoneMidRound(field);
+  const decided = roundsStarted === 2 && roundTwoComplete(field);
   return { line, decided, byThirdRound: false };
 }
 

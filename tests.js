@@ -512,6 +512,22 @@ check('the cut is final the moment round 2 is complete, before any round 3', () 
   assert.equal(scorecards.find((g) => g.id === GOLFERS.mcilroy.id).state, 'cut', 'and cut on the scorecard');
 });
 
+check('a lone "thru 0" withdrawal does not hold the cut open', () => {
+  // Real case: a WD sits in the feed at "round 2, thru 0" long after everyone
+  // else has finished. It must not keep the cut a projection forever.
+  const field = [
+    player('Scottie Scheffler', [-3, -3], GOLFERS.scheffler.id), // -6, inside
+    player('Rory McIlroy', [4, 5], GOLFERS.mcilroy.id), // +9, outside
+  ];
+  for (let i = 0; i < 69; i++) field.push(player(`Good ${i}`, [-1, -1], `g${i}`)); // -2
+  field.push(player('WD Guy', [3, 0], 'wd1', 0)); // round 2 exists but thru 0
+
+  const { cut, golferBoard } = computeStandings(board(field));
+  assert.equal(cut.decided, true, 'still final despite the stuck withdrawal');
+  assert.equal(golferBoard.find((g) => g.id === GOLFERS.mcilroy.id).madeCut, false, 'the cut golfer is flagged');
+  assert.equal(golferBoard.find((g) => g.id === GOLFERS.scheffler.id).madeCut, true, 'the survivor is not');
+});
+
 check('the golfer board carries live round progress for the status indicator', () => {
   const field = [player('Scottie Scheffler', [-3, -3, -2], GOLFERS.scheffler.id, 9)];
   const g = computeStandings(board(field)).golferBoard.find((x) => x.id === GOLFERS.scheffler.id);
