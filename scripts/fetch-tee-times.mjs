@@ -22,21 +22,16 @@ const getJSON = async (url) => {
   if (!r.ok) throw new Error(`${r.status} ${url}`);
   return r.json();
 };
-const withLimit = (ref) => ref + (ref.includes('?') ? '&' : '?') + 'limit=300';
-const statusURL = (ref) => {
-  const [path, query] = ref.split('?');
-  return `${path}/status${query ? `?${query}` : ''}`;
-};
 
+// event → competition ref → competitors list. The competitors collection lives
+// at {competition}/competitors; each item is a $ref to a competitor whose id is
+// the golfer's athlete id (the same id we pin in config).
 const event = await getJSON(`${CORE}/events/${EVENT.id}?lang=en&region=us`);
 const compRef = event.competitions?.[0]?.$ref;
 if (!compRef) throw new Error('no competition ref on event');
 
-const competition = await getJSON(compRef);
-const listRef = competition.competitors?.$ref;
-if (!listRef) throw new Error('no competitors ref on competition');
-
-const list = await getJSON(withLimit(listRef));
+const compBase = compRef.split('?')[0];
+const list = await getJSON(`${compBase}/competitors?limit=300&lang=en&region=us`);
 const items = list.items || [];
 console.log(`field: ${items.length} competitors`);
 
@@ -47,7 +42,14 @@ for (const it of items) {
   const key = id && OURS.get(id);
   if (!key) continue; // not one of our drafted golfers
   try {
-    const st = await getJSON(statusURL(it.$ref));
+    // Follow the competitor's own status ref (period, teeTime, thru).
+    const competitor = await getJSON(it.$ref);
+    const statusRef = competitor.status?.$ref;
+    if (!statusRef) {
+      console.log(`${key}: no status ref`);
+      continue;
+    }
+    const st = await getJSON(statusRef);
     if (st.teeTime && st.period) {
       (rounds[st.period] ||= {})[key] = st.teeTime;
       found++;
