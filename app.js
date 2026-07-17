@@ -183,11 +183,17 @@ function golferRow(golfer, roundsStarted) {
 
 function entryCard(row, roundsStarted, live) {
   const isOpen = expanded.has(row.manager);
-  const cut = row.golfers.filter((g) => g.cut).length;
+  // Confirmed cut vs. penalty actually charged: between round 2 finishing and
+  // round 3 being played a golfer is cut but not yet penalised, so say exactly
+  // that rather than claiming a penalty that hasn't landed.
+  const missed = row.golfers.filter((g) => g.cut).length;
+  const penalized = row.golfers.filter((g) => g.penalized).length;
 
-  const penaltyNote = cut
-    ? `<span class="chip warn">${cut} missed cut · penalty applied</span>`
-    : '';
+  const penaltyNote = penalized
+    ? `<span class="chip warn">${penalized} missed cut · penalty applied</span>`
+    : missed
+      ? `<span class="chip warn">${missed} missed cut</span>`
+      : '';
   let tieNote = '';
   if (row.unresolved) {
     tieNote = `<span class="chip danger">dead heat — tiebreaker not settled · ${formatToPar(row.prediction)}</span>`;
@@ -197,7 +203,7 @@ function entryCard(row, roundsStarted, live) {
 
   const picksPreview = row.golfers.map((g) => g.name.split(' ').slice(-1)[0]).join(' · ');
 
-  return `<li class="entry${isOpen ? ' open' : ''}${cut ? ' has-cut' : ''}${row.unresolved ? ' unresolved' : ''}" data-manager="${row.manager}">
+  return `<li class="entry${isOpen ? ' open' : ''}${missed ? ' has-cut' : ''}${row.unresolved ? ' unresolved' : ''}" data-manager="${row.manager}">
     <button class="entry-head" aria-expanded="${isOpen}">
       <span class="pick">${live ? ORDINALS[row.pick - 1] : '—'}</span>
       <span class="manager">

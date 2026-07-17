@@ -162,25 +162,42 @@ function applyDemoIdentities(event) {
   });
 }
 
-// Where the cut currently sits.
+const HOLES = 18;
+
+// Is anyone still out on the course — a round begun but not finished? Lets us tell
+// "round 2 is still being played" (the cut is a projection) from "round 2 is
+// complete" (the cut is final) without waiting for round 3 to start.
+function anyoneMidRound(field) {
+  return field.some((p) => {
+    if (p.roundsPlayed === 0) return false;
+    const cur = Math.max(...Object.keys(p.rounds).map(Number));
+    return (p.holes?.[cur] ?? 0) < HOLES;
+  });
+}
+
+// Where the cut currently sits, and whether it's final.
 //
-// Rounds 1-2: a projection. Sort the field on their running total and read off
-// the score of the player in CUT_SIZE-th place; everyone level with them is
-// inside too ("and ties"). This number moves all through Friday.
+// Rounds 1-2 in progress: a projection. Sort the field on their 36-hole total and
+// read off the CUT_SIZE-th score; everyone level with it is inside too ("and
+// ties"). This number moves all through Friday.
 //
-// Round 3+: the cut has happened, so it's a fact, not a guess. Anyone with a
-// third-round score survived it, and the line is the worst 36-hole total among
-// them.
+// The cut is FINAL the moment round 2 is complete — no need to wait for round 3
+// to be played. Once every card is in and no third round has begun, that same
+// 36-hole line is the real cut: above it you survive, below it you are gone.
+//
+// Round 3+: still a fact, read a different way — a survivor has a third-round
+// score, and the line is the worst 36-hole total among them (which also absorbs
+// anyone who withdrew after the cut).
 function computeCut(field, roundsStarted) {
   if (roundsStarted === 0) return { line: null, decided: false };
 
   if (roundsStarted >= 3) {
     const survivors = field.filter((p) => p.rounds[3] != null);
-    if (survivors.length === 0) return { line: null, decided: true };
+    if (survivors.length === 0) return { line: null, decided: true, byThirdRound: true };
     const line = Math.max(
       ...survivors.map((p) => (p.rounds[1] ?? 0) + (p.rounds[2] ?? 0)),
     );
-    return { line, decided: true };
+    return { line, decided: true, byThirdRound: true };
   }
 
   const totals = field
@@ -190,10 +207,10 @@ function computeCut(field, roundsStarted) {
   if (totals.length === 0) return { line: null, decided: false };
 
   const line = totals[Math.min(CUT_SIZE - 1, totals.length - 1)];
-  return { line, decided: false };
+  // Decided as soon as the whole field has posted its 36 holes.
+  const decided = roundsStarted === 2 && !anyoneMidRound(field);
+  return { line, decided, byThirdRound: false };
 }
-
-const HOLES = 18;
 
 // The worst score anyone in the field has POSTED in a given round — the penalty
 // a missed-cut golfer is charged for it.
@@ -230,10 +247,14 @@ function worstInRound(field, round) {
   };
 }
 
-// Did this player miss the cut? Only knowable once round 3 exists: a survivor
-// has a third-round score, a casualty stops at 36 holes.
+// Did this player miss the cut? Only once the cut is decided. After round 3 has
+// begun a survivor simply has a third-round score. In the gap between round 2
+// finishing and round 3 starting we compare their 36-hole total to the final line
+// ("top 70 and ties" — level with the line survives).
 function missedCut(player, cut) {
-  return cut.decided && player.roundsPlayed > 0 && player.rounds[3] == null;
+  if (!cut.decided || player.roundsPlayed === 0) return false;
+  if (cut.byThirdRound) return player.rounds[3] == null;
+  return cut.line != null && player.total != null && player.total > cut.line;
 }
 
 // The tee time for a golfer's *upcoming* round — but only while they genuinely
@@ -378,7 +399,12 @@ export function computeStandings(board) {
         actual: player.total,
         total: roundsStarted > 0 ? total : null,
         penaltyRounds,
-        cut: penaltyRounds.length > 0,
+        // `cut` = confirmed missed the cut (drives the MC badge, greying and the
+        // status pill on every page — true as soon as the cut is decided, even in
+        // the gap before round 3). `penalized` = a worst-in-field penalty has
+        // actually been charged yet, which can only happen once round 3+ is played.
+        cut: missedCut(player, cut),
+        penalized: penaltyRounds.length > 0,
         thru,
         currentRound,
         roundComplete,
@@ -477,10 +503,10 @@ export function computeStandings(board) {
       const player = byId.get(meta.id);
       const total = player?.total ?? null;
 
-      // After the cut, survival is a fact: you have a third round or you don't.
-      // Before it, it's a projection against a moving line.
-      const survived = player ? player.rounds[3] != null : false;
-      const madeCut = cut.decided ? survived : null;
+      // Whether they made the cut. Once it's decided this is a fact — a survivor
+      // is anyone we don't mark as having missed it. Before it's decided we can
+      // only project against the moving line.
+      const madeCut = cut.decided && player ? !missedCut(player, cut) : null;
       const projectedIn =
         cut.decided || cut.line == null || total == null ? null : total <= cut.line;
 
@@ -521,7 +547,7 @@ export function computeStandings(board) {
         projectedIn,
         // Strokes inside (negative) or outside (positive) the line.
         toCut: total != null && cut.line != null ? total - cut.line : null,
-        inside: cut.decided ? survived : projectedIn,
+        inside: cut.decided ? madeCut === true : projectedIn,
         // Tee time for their upcoming round, while they've yet to start it.
         teeTime: player ? upcomingTee(player, cut) : null,
         // Round progress + a cut flag, for the status indicator (which stays

@@ -486,9 +486,30 @@ check('a confirmed missed cut is flagged for the MC badge on every view', () => 
   assert.equal(d.golferBoard.find((g) => g.id === GOLFERS.scheffler.id).madeCut, true, 'survivor not flagged');
   assert.equal(d.scorecards.find((g) => g.id === GOLFERS.mcilroy.id).state, 'cut', 'scorecard shows cut');
 
-  // Rounds 1-2 only: the cut is not decided, so nobody is flagged yet.
-  const early = computeStandings(board([player('Rory McIlroy', [5, 5], GOLFERS.mcilroy.id)]));
-  assert.equal(early.golferBoard.find((g) => g.id === GOLFERS.mcilroy.id).madeCut, null, 'no flag before the cut is decided');
+  // Round 2 still being played (thru 9): the cut isn't final, so nobody is flagged.
+  const early = computeStandings(board([player('Rory McIlroy', [5, 5], GOLFERS.mcilroy.id, 9)]));
+  assert.equal(early.golferBoard.find((g) => g.id === GOLFERS.mcilroy.id).madeCut, null, 'no flag while round 2 is live');
+});
+
+check('the cut is final the moment round 2 is complete, before any round 3', () => {
+  // Everyone has signed for 36 holes and no third round has begun.
+  const field = [
+    player('Scottie Scheffler', [-3, -3], GOLFERS.scheffler.id), // -6, inside
+    player('Rory McIlroy', [4, 5], GOLFERS.mcilroy.id), // +9, outside
+  ];
+  for (let i = 0; i < 69; i++) field.push(player(`Good ${i}`, [-1, -1], `g${i}`)); // -2 → fills the top 70
+  const { cut, golferBoard, scorecards } = computeStandings(board(field));
+
+  assert.equal(cut.decided, true, 'final as soon as round 2 is in');
+  assert.ok(!cut.byThirdRound, 'decided by the 36-hole line, not by a third round');
+  assert.equal(cut.line, -2, 'the 70th score is -2');
+
+  const rory = golferBoard.find((g) => g.id === GOLFERS.mcilroy.id);
+  const scottie = golferBoard.find((g) => g.id === GOLFERS.scheffler.id);
+  assert.equal(rory.madeCut, false, 'below the line → cut');
+  assert.equal(scottie.madeCut, true, 'above the line → safe');
+  assert.equal(rory.position, 'CUT', 'shown as CUT on the leaderboard');
+  assert.equal(scorecards.find((g) => g.id === GOLFERS.mcilroy.id).state, 'cut', 'and cut on the scorecard');
 });
 
 check('the golfer board carries live round progress for the status indicator', () => {
@@ -531,10 +552,12 @@ check('projects the cut at the 70th player and ties while rounds 1-2 are live', 
   const field = [
     ...Object.values(GOLFERS).map((g) => player(g.name, [0, 0], g.id)), // E
     ...filler,
+    // Someone still out on the course in round 2, so the cut is not yet final.
+    player('Still Playing', [0, 0], 'live1', 9), // E, thru 9 of round 2
   ];
   const { cut, golferBoard } = computeStandings(board(field));
 
-  assert.equal(cut.decided, false, 'still a projection during round 2');
+  assert.equal(cut.decided, false, 'still a projection while round 2 is being played');
   assert.equal(cut.line, 3, 'the 70th score is +3');
 
   // Our golfers are all at E, comfortably inside a +3 line.

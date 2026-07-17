@@ -17,7 +17,11 @@ leaderboard straight from ESPN in the browser and recomputes the standings every
   round twice. (In the 2026 Scottish Open that would have been +9 and +7 — enough
   to put even the best missed-cut player behind the last-place finisher.) A golfer
   confirmed to have missed the cut carries a red **MC** badge next to their name on
-  every tab — only once the cut is decided (round 3+), never as a projection.
+  every tab. The cut is recognised as **final the moment round 2 is complete** —
+  the board doesn't wait for round 3 to start; survivors are read off the 36-hole
+  line (top 70 and ties). The worst-round penalty itself only lands once round 3 is
+  actually played (there's no field-worst-round to charge before then), so in the
+  gap a cut golfer shows the badge but their score is still their real 36 holes.
 
 ### How the penalty updates live
 
