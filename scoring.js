@@ -239,9 +239,12 @@ function upcomingTee(player, cut) {
   // rounds only — so there is nothing upcoming to show.
   if (period != null && period > TOURNAMENT_ROUNDS) return null;
   if (period != null) {
-    // They've begun the round the tee time is for → it's not upcoming.
-    const begun = player.rounds[period] != null || (player.holes?.[period] ?? 0) > 0;
-    if (begun) return null;
+    // Keep the tee time visible right up until the golfer is genuinely underway —
+    // a hole actually recorded in that round. ESPN can hang a placeholder round
+    // score ("E"/"-") on a player at or just before their tee, so the presence of
+    // a round entry alone isn't proof they've started; waiting for a real hole
+    // means the tee stays put until it truly occurs.
+    if ((player.holes?.[period] ?? 0) > 0) return null;
   } else if (player.roundsPlayed > 0) {
     // No period in the feed: fall back to progress. Only a golfer whose latest
     // round is complete is waiting on a next tee; a mid-round one is not.

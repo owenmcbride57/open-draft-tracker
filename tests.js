@@ -649,6 +649,16 @@ check('a golfer yet to tee off carries their round-1 tee time everywhere', () =>
   assert.equal(drafted.teeTime, TEE, 'the draft board shows it too');
 });
 
+check('the tee time stays put until a hole is played, not on a placeholder round score', () => {
+  // ESPN can hang an "E"/"-" round score on a player at the tee, before any hole
+  // is complete. The chip must persist until the golfer genuinely gets underway,
+  // so it stays there right up until the tee actually occurs.
+  const field = [withTee(player('Scottie Scheffler', [0], GOLFERS.scheffler.id, 0), TEE, 1)];
+  const s = computeStandings(board(field)).scorecards.find((g) => g.id === GOLFERS.scheffler.id);
+  assert.equal(s.thru, 0, 'no holes recorded yet');
+  assert.equal(s.teeTime, TEE, 'a placeholder round score must not drop the tee time');
+});
+
 check('a golfer mid-round has no upcoming tee time', () => {
   // On the course in round 1 (9 holes in): the tee time is for the round already
   // begun, so there is nothing upcoming to count down to.

@@ -90,7 +90,10 @@ their round-1 tee; between rounds it becomes the next round's tee the moment ESP
 publishes the pairing, and until then there's nothing to show. A golfer who is
 mid-round, has finished the tournament, or missed the cut has no upcoming round,
 so no chip. ESPN stamps each tee time with the round it belongs to, so "has not
-started it" is read straight off the feed rather than guessed.
+started it" is read straight off the feed rather than guessed. The chip stays up
+until the golfer has actually **played a hole** — a placeholder round score ESPN
+can hang on a player at the tee doesn't drop it early, so it lasts until the tee
+genuinely occurs.
 
 The time is rendered in **the viewer's own local timezone** — the browser knows
 where you are, so a manager in California sees Pacific and one in Scotland sees
