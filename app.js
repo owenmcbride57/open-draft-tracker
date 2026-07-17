@@ -403,7 +403,7 @@ function renderGolferBoard({ cut, golferBoard, roundsStarted, winningScore, lead
 
     return `<li class="golfer-row ${standing}${crown ? ' is-leader' : ''}">
       ${pos}
-      <span class="g-name">${avatar(g)}${g.name}${crown}${cutBadge(g.madeCut === false)}${teeTag(g.teeTime)}</span>
+      <span class="g-name">${avatar(g)}${g.name}${crown}${cutBadge(g.madeCut === false)}${holeIndicator(g)}</span>
       <span class="g-owners"><span class="count">${g.owners.length}×</span> ${g.owners.join(', ')}</span>
       <span class="g-rounds">${rounds(g)}</span>
       ${margin}

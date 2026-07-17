@@ -496,6 +496,18 @@ export function computeStandings(board) {
             ? `${rank.tied ? 'T' : ''}${rank.pos}`
             : null;
 
+      // Live progress through the round they're on — not started → thru N → F —
+      // for the leaderboard's per-golfer status indicator. ESPN has no mid-hole
+      // state, so "thru N" counts the holes whose cards are in.
+      let thru = 0;
+      let currentRound = 0;
+      let roundComplete = false;
+      if (player && player.roundsPlayed > 0) {
+        currentRound = Math.max(...Object.keys(player.rounds).map(Number));
+        thru = player.holes?.[currentRound] ?? 0;
+        roundComplete = thru >= HOLES;
+      }
+
       return {
         ...meta,
         key,
@@ -512,6 +524,12 @@ export function computeStandings(board) {
         inside: cut.decided ? survived : projectedIn,
         // Tee time for their upcoming round, while they've yet to start it.
         teeTime: player ? upcomingTee(player, cut) : null,
+        // Round progress + a cut flag, for the status indicator (which stays
+        // hidden for a golfer who's missed the cut — the MC badge covers them).
+        thru,
+        currentRound,
+        roundComplete,
+        cut: madeCut === false,
       };
     })
     .sort((a, b) => {

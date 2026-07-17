@@ -491,6 +491,14 @@ check('a confirmed missed cut is flagged for the MC badge on every view', () => 
   assert.equal(early.golferBoard.find((g) => g.id === GOLFERS.mcilroy.id).madeCut, null, 'no flag before the cut is decided');
 });
 
+check('the golfer board carries live round progress for the status indicator', () => {
+  const field = [player('Scottie Scheffler', [-3, -3, -2], GOLFERS.scheffler.id, 9)];
+  const g = computeStandings(board(field)).golferBoard.find((x) => x.id === GOLFERS.scheffler.id);
+  assert.equal(g.currentRound, 3, 'on their third round');
+  assert.equal(g.thru, 9, 'nine holes in');
+  assert.equal(g.roundComplete, false, 'not finished the round');
+});
+
 check('a golfer who has not teed off shows no position or card', () => {
   const field = Object.values(GOLFERS).map((g) => player(g.name, [], g.id));
   const { scorecards } = computeStandings(board(field, { started: false }));

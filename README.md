@@ -80,7 +80,8 @@ button moves between tabs.
   the live leader, ranked by who's closest.
 - **Golfers & cut** (`#golfers`) — all eleven drafted golfers with their real
   live scores, split by the cut line: above it you survive, below it you're going
-  home.
+  home. Each active golfer shows a live status pill next to their name — *thru N*
+  while they're out, *F* once the round's signed.
 - **Scorecards** (`#cards`) — live position, today's score, holes played and a
   hole-by-hole card for every drafted golfer.
 
