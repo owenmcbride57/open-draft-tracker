@@ -755,6 +755,13 @@ main {
   background: #2a1414;
 }
 
+.chip.win {
+  color: var(--gold);
+  border-color: #5c4a12;
+  background: #241f0c;
+  font-weight: 600;
+}
+
 .entry.unresolved { border-color: #6b2b2b; }
 
 /* Demo mode must never be mistaken for real scores. */
@@ -780,6 +787,25 @@ body.demo .refresh-line {
   font-weight: 700;
   text-align: right;
 }
+
+/* When a playoff bonus is folded in, the big number is the draft-order total and
+   a small line beneath spells out the raw score plus the bonus, so the actual
+   tournament score is never hidden behind the adjusted one. */
+.total.has-bonus {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  line-height: 1.1;
+}
+
+.total-breakdown {
+  font-size: 0.68rem;
+  font-weight: 500;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.total-breakdown .bonus { color: var(--gold); }
 
 /* ---------- expanded golfers ---------- */
 
@@ -875,6 +901,12 @@ body.demo .refresh-line {
 }
 
 .badge.cut { background: #4a2020; color: #fca5a5; }
+
+/* Playoff winner — gold, matching the LEADER badge, because it's a reward, not a
+   penalty. Never sits on a score; it flags the one-stroke draft-order bonus. */
+.badge.win { background: var(--gold); color: #0b1410; }
+.golfer.is-winner .golfer-name,
+.golfer-row.is-winner .g-name { color: var(--gold); }
 
 .rounds { display: flex; gap: 0.3rem; }
 

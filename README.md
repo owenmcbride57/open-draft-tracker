@@ -56,6 +56,31 @@ which already excludes playoff strokes, so the two always agree. The winner and
 the runner-up finish level on fantasy score, exactly as they finished level over
 72 holes. `tests.js` pins this under "playoff contingency".
 
+### The playoff winner earns a one-stroke draft bonus
+
+Leaving the winner and runner-up dead level is fair on **strokes**, but it means
+someone who picked the eventual champion gets no reward over someone who picked
+the golfer they beat. So there is one deliberate exception, and it lives entirely
+in the **draft order**, never in a score.
+
+The golfer who **wins** the playoff gives their owners a **−1 bonus**. Concretely:
+
+- No stroke count is touched. Every golfer's total stays a clean 72-hole figure —
+  the winner and runner-up are still level at, say, −12. Participating in a
+  playoff never penalises or adjusts anyone's score.
+- The bonus is a **separate figure** applied to the entry's *draft-order* total
+  (`adjustedTotal`). The board shows the real combined score and the −1 bonus
+  side by side, tagged as a bonus, so the two are never confused.
+- It is decided **only once the championship is complete**, so it never flickers
+  on while the extra holes are still being played. The winner is read off the
+  feed as the playoff participant with the best (lowest) aggregate over the extra
+  holes — the same way the trophy is decided.
+- Every manager who drafted the winner gets it (Scheffler carries seven owners);
+  a manager who drafted the *runner-up* gets nothing. That is the whole point:
+  picking the right golfer of a playoff pair now beats picking the wrong one.
+
+`tests.js` pins this under "playoff winner bonus".
+
 ### Dead heats are deliberately left unresolved
 
 The tiebreaker can itself tie. Jack and Patrick John Kealy III both predicted −9,
