@@ -96,6 +96,15 @@ function cutBadge(missed) {
   return missed ? '<span class="badge cut" title="Missed the cut">MC</span>' : '';
 }
 
+// A gold badge marking the golfer who won a playoff. Their tournament score is
+// unchanged — this only signals the one-stroke draft-order bonus their owners
+// earn — so it reads as a bonus, never a score adjustment.
+function winBadge(won) {
+  return won
+    ? '<span class="badge win" title="Won a playoff — one-stroke draft-order bonus for their owners (no change to their tournament score)">🏆 PLAYOFF</span>'
+    : '';
+}
+
 function roundCells(golfer, roundsStarted) {
   const cells = [];
   for (let r = 1; r <= 4; r++) {
@@ -174,8 +183,8 @@ function golferRow(golfer, roundsStarted) {
     </li>`;
   }
 
-  return `<li class="golfer${golfer.cut ? ' is-cut' : ''}">
-    <span class="golfer-name">${golfer.name}${cutBadge(golfer.cut)}${holeIndicator(golfer)}</span>
+  return `<li class="golfer${golfer.cut ? ' is-cut' : ''}${golfer.playoffWinner ? ' is-winner' : ''}">
+    <span class="golfer-name">${golfer.name}${cutBadge(golfer.cut)}${winBadge(golfer.playoffWinner)}${holeIndicator(golfer)}</span>
     <span class="rounds">${roundCells(golfer, roundsStarted)}</span>
     <span class="golfer-total">${formatToPar(golfer.total)}</span>
   </li>`;
@@ -201,6 +210,22 @@ function entryCard(row, roundsStarted, live) {
     tieNote = `<span class="chip">tiebreaker settled · ${formatToPar(row.prediction)}</span>`;
   }
 
+  // Drafted the playoff winner → a one-stroke draft-order bonus, called out as a
+  // bonus so it never reads as a change to the tournament score.
+  const winnerGolfer = row.golfers.find((g) => g.playoffWinner);
+  const bonusNote = winnerGolfer
+    ? `<span class="chip win" title="Drafted ${winnerGolfer.name}, the playoff winner — one-stroke draft-order bonus">🏆 ${winnerGolfer.name.split(' ').slice(-1)[0]} won the playoff · −1 bonus</span>`
+    : '';
+
+  // The draft-order figure is the bonus-adjusted total. When a bonus applies,
+  // show it broken out — actual score + bonus — so the real tournament score
+  // stays legible next to the adjusted one.
+  const totalCell = !live
+    ? '—'
+    : row.playoffBonus
+      ? `${formatToPar(row.adjustedTotal)}<span class="total-breakdown" title="Actual score ${formatToPar(row.total)} plus a ${formatToPar(row.playoffBonus)} playoff bonus">${formatToPar(row.total)} <span class="bonus">${formatToPar(row.playoffBonus)} bonus</span></span>`
+      : formatToPar(row.total);
+
   const picksPreview = row.golfers.map((g) => g.name.split(' ').slice(-1)[0]).join(' · ');
 
   return `<li class="entry${isOpen ? ' open' : ''}${missed ? ' has-cut' : ''}${row.unresolved ? ' unresolved' : ''}" data-manager="${row.manager}">
@@ -210,9 +235,9 @@ function entryCard(row, roundsStarted, live) {
         <span class="manager-name">${row.manager}</span>
         <span class="picks-preview">${picksPreview}</span>
       </span>
-      <span class="chips">${penaltyNote}${tieNote}</span>
+      <span class="chips">${bonusNote}${penaltyNote}${tieNote}</span>
       <span class="prediction" title="Predicted winning score (tiebreaker)">${formatToPar(row.prediction)}</span>
-      <span class="total">${live ? formatToPar(row.total) : '—'}</span>
+      <span class="total${row.playoffBonus ? ' has-bonus' : ''}">${totalCell}</span>
     </button>
     <ul class="golfers">
       ${row.golfers.map((g) => golferRow(g, roundsStarted)).join('')}
@@ -407,9 +432,9 @@ function renderGolferBoard({ cut, golferBoard, roundsStarted, winningScore, lead
         ? '<span class="g-pos none">—</span>'
         : `<span class="g-pos${g.position === 'CUT' ? ' cut' : ''}">${g.position}</span>`;
 
-    return `<li class="golfer-row ${standing}${crown ? ' is-leader' : ''}">
+    return `<li class="golfer-row ${standing}${crown ? ' is-leader' : ''}${g.playoffWinner ? ' is-winner' : ''}">
       ${pos}
-      <span class="g-name">${avatar(g)}${g.name}${crown}${cutBadge(g.madeCut === false)}${holeIndicator(g)}</span>
+      <span class="g-name">${avatar(g)}${g.name}${crown}${cutBadge(g.madeCut === false)}${winBadge(g.playoffWinner)}${holeIndicator(g)}</span>
       <span class="g-owners"><span class="count">${g.owners.length}×</span> ${g.owners.join(', ')}</span>
       <span class="g-rounds">${rounds(g)}</span>
       ${margin}
@@ -512,7 +537,7 @@ function renderScorecards({ scorecards = [], roundsStarted }) {
       return `<li class="scorecard ${g.state}">
         <div class="sc-head">
           ${pos}
-          <span class="sc-name">${avatar(g)}${g.name}${cutBadge(g.state === 'cut')}${teeTag(g.teeTime)}</span>
+          <span class="sc-name">${avatar(g)}${g.name}${cutBadge(g.state === 'cut')}${winBadge(g.playoffWinner)}${teeTag(g.teeTime)}</span>
           <span class="sc-owners">${g.owners.join(', ')}</span>
           ${today}
           ${thru}
@@ -572,9 +597,19 @@ function render(board, standings) {
         ([r, p]) =>
           `R${r} ${formatToPar(p.score)}${p.settled ? '' : ` (provisional — ${p.playing} still out)`}`,
       );
+    // A settled playoff, in plain language: who won and who it rewards. The
+    // wording keeps the bonus distinct from the tournament score.
+    const w = standings.playoffWinner;
+    const playoffNote = w
+      ? ` Playoff won by ${w.name} — a −1 draft-order bonus${
+          w.owners.length ? ` for ${w.owners.join(', ')}` : ' (nobody drafted them)'
+        }, with no change to their score.`
+      : '';
+
     leaderNoteEl.textContent =
       (winningScore != null ? ` Leader at ${formatToPar(winningScore)}.` : '') +
-      (applied.length ? ` Missed-cut penalty: ${applied.join(', ')}.` : '');
+      (applied.length ? ` Missed-cut penalty: ${applied.join(', ')}.` : '') +
+      playoffNote;
   }
 
   lastUpdated = Date.now();

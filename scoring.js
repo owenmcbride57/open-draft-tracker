@@ -67,15 +67,29 @@ export async function fetchLeaderboard({ demo = false, teeTimes = TEE_TIMES } = 
     const holes = {}; // round number -> holes completed in it (18 = round done)
     const cards = {}; // round number -> [{ hole, strokes, result }] in hole order
 
+    // Playoff participation, kept entirely out of every fantasy figure below. A
+    // golfer who ties for the win plays extra holes, and which of those golfers
+    // *wins* them earns their owners a one-stroke draft-order bonus — so we do
+    // need to see the playoff, even though it must never touch a score.
+    let inPlayoff = false;
+    let playoffScore = null; // aggregate to-par over the playoff holes
+
     for (const ls of c.linescores || []) {
       // A tie for the win is settled by a playoff, which ESPN reports as further
       // rounds (period 5+). Those extra holes decide the trophy, not the score —
       // the fantasy total is a 72-hole figure — so a golfer dragged into a playoff
-      // must be neither charged nor credited for it. Dropping the period here is
-      // the whole contingency: it never reaches roundsStarted, the penalty maths,
-      // the totals or the scorecards. (The golfer's overall to-par total comes
-      // from ESPN's own `score`, which already excludes playoff strokes.)
-      if (Number(ls.period) > TOURNAMENT_ROUNDS) continue;
+      // must be neither charged nor credited for it. Dropping the period from
+      // rounds/holes/cards is the whole contingency: it never reaches
+      // roundsStarted, the penalty maths, the totals or the scorecards. (The
+      // golfer's overall to-par total comes from ESPN's own `score`, which already
+      // excludes playoff strokes.) We record only that they were in the playoff
+      // and their aggregate over it, used solely to credit the winner's bonus.
+      if (Number(ls.period) > TOURNAMENT_ROUNDS) {
+        inPlayoff = true;
+        const p = toPar(ls.displayValue);
+        if (p != null) playoffScore = (playoffScore ?? 0) + p;
+        continue;
+      }
 
       const par = toPar(ls.displayValue);
       if (par == null) continue;
@@ -117,6 +131,8 @@ export async function fetchLeaderboard({ demo = false, teeTimes = TEE_TIMES } = 
       total: toPar(c.score),
       teeTime,
       teePeriod,
+      inPlayoff,
+      playoffScore,
     };
   });
 
@@ -327,9 +343,32 @@ function computeFieldRanks(field, cut) {
   return rankById;
 }
 
+// Who won the playoff, if there was one. A playoff is stroke play over extra
+// holes, so the winner is the participant with the best (lowest) aggregate over
+// them — the golfer everyone else in the playoff finished behind. Returns the
+// winner's ESPN id, or null when there was no playoff or it hasn't produced a
+// single clear winner yet (no holes posted, or still level and heading to more).
+//
+// Only ever consulted once the tournament is complete (see computeStandings), so
+// by the time it runs a decided playoff always has one lowest score; the tie
+// guard is a safety net, never the normal path.
+function resolvePlayoffWinner(field) {
+  const scored = field.filter((p) => p.inPlayoff && p.playoffScore != null);
+  if (scored.length === 0) return null;
+  const best = Math.min(...scored.map((p) => p.playoffScore));
+  const winners = scored.filter((p) => p.playoffScore === best);
+  return winners.length === 1 ? winners[0].id : null;
+}
+
 export function computeStandings(board) {
-  const { field, started } = board;
+  const { field, started, complete } = board;
   const byId = new Map(field.map((p) => [p.id, p]));
+
+  // The playoff winner earns a one-stroke draft-order bonus for whoever drafted
+  // them — settled only once the championship is over, so a bonus never flickers
+  // on mid-playoff. It adjusts the draft order alone; no golfer's stroke count is
+  // ever touched (see the golfer totals below, which stay a pure 72-hole figure).
+  const playoffWinnerId = complete ? resolvePlayoffWinner(field) : null;
 
   // How far into the tournament are we? A round "counts" once anyone has a
   // score for it. Before Thursday this is 0 and nothing is penalised.
@@ -416,6 +455,9 @@ export function computeStandings(board) {
         // actually been charged yet, which can only happen once round 3+ is played.
         cut: missedCut(player, cut),
         penalized: penaltyRounds.length > 0,
+        // The golfer who won the playoff. Purely a flag for the bonus and its
+        // badge — their `total` above is untouched, a clean 72-hole figure.
+        playoffWinner: !!player && player.id === playoffWinnerId,
         thru,
         currentRound,
         roundComplete,
@@ -424,21 +466,30 @@ export function computeStandings(board) {
       };
     });
 
+    // Actual combined score — a pure sum of 72-hole golfer totals, never adjusted.
     const total = roundsStarted > 0
       ? golfers.reduce((sum, g) => sum + (g.total ?? 0), 0)
       : null;
 
+    // One-stroke bonus if this manager drafted the playoff winner. Kept separate
+    // from `total` so the board can show the real tournament score alongside it;
+    // `adjustedTotal` is the figure the draft order is actually decided on.
+    const playoffBonus = golfers.some((g) => g.playoffWinner) ? -1 : 0;
+    const adjustedTotal = total == null ? null : total + playoffBonus;
+
     const tiebreak = winningScore != null ? Math.abs(entry.prediction - winningScore) : null;
 
-    return { ...entry, golfers, total, tiebreak };
+    return { ...entry, golfers, total, playoffBonus, adjustedTotal, tiebreak };
   });
 
-  // Lowest combined score picks first. Ties broken by whose predicted winning
-  // score is closest to the actual one. Before a ball is struck there is nothing
-  // to rank, so leave the entries in their listed order rather than implying one.
+  // Lowest combined score picks first — measured on the bonus-adjusted total, so
+  // the playoff winner's owner edges ahead of anyone level with them on raw
+  // strokes. Ties broken by whose predicted winning score is closest to the
+  // actual one. Before a ball is struck there is nothing to rank, so leave the
+  // entries in their listed order rather than implying one.
   if (roundsStarted > 0) {
     rows.sort((a, b) => {
-      if (a.total !== b.total) return (a.total ?? 0) - (b.total ?? 0);
+      if (a.adjustedTotal !== b.adjustedTotal) return (a.adjustedTotal ?? 0) - (b.adjustedTotal ?? 0);
       if (a.tiebreak !== b.tiebreak) return (a.tiebreak ?? 0) - (b.tiebreak ?? 0);
       return a.manager.localeCompare(b.manager);
     });
@@ -451,13 +502,15 @@ export function computeStandings(board) {
   // arbitrary and the league has to settle it, so say so rather than pretending.
   rows.forEach((row, i) => {
     row.pick = i + 1;
-    if (!started || row.total == null) {
+    if (!started || row.adjustedTotal == null) {
       row.tiedOnScore = false;
       row.unresolved = false;
       row.unresolvedWith = [];
       return;
     }
-    const tiedOnScore = rows.filter((r) => r !== row && r.total === row.total);
+    // Ties are on the draft-order figure, not raw strokes: a playoff bonus that
+    // lifts one manager clear of another means they are no longer tied at all.
+    const tiedOnScore = rows.filter((r) => r !== row && r.adjustedTotal === row.adjustedTotal);
     const stillTied = tiedOnScore.filter((r) => r.tiebreak === row.tiebreak);
 
     row.tiedOnScore = tiedOnScore.length > 0;
@@ -567,6 +620,8 @@ export function computeStandings(board) {
         currentRound,
         roundComplete,
         cut: madeCut === false,
+        // Won a playoff → their owners get the draft-order bonus. Score untouched.
+        playoffWinner: !!player && player.id === playoffWinnerId,
       };
     })
     .sort((a, b) => {
@@ -584,7 +639,14 @@ export function computeStandings(board) {
   const scorecards = Object.entries(GOLFERS)
     .map(([key, meta]) => {
       const p = byId.get(meta.id);
-      const base = { ...meta, key, owners: owners.get(key) ?? [] };
+      const base = {
+        ...meta,
+        key,
+        owners: owners.get(key) ?? [],
+        // Playoff winner → owners get the draft bonus; the card's totals stay as
+        // they are, a straight 72 holes with no playoff strokes.
+        playoffWinner: !!p && p.id === playoffWinnerId,
+      };
 
       if (!p) return { ...base, found: false, state: 'missing', total: null, holes: [] };
       if (p.roundsPlayed === 0) {
@@ -644,6 +706,20 @@ export function computeStandings(board) {
       return a.total - b.total || a.name.localeCompare(b.name);
     });
 
+  // The playoff outcome, for a plain-language note on the board. Null when there
+  // was no playoff (or it isn't settled): the winner's name and who drafted them.
+  const playoffWinner = playoffWinnerId
+    ? (() => {
+        const g = byId.get(playoffWinnerId);
+        const key = ID_TO_KEY.get(playoffWinnerId);
+        return {
+          id: playoffWinnerId,
+          name: g?.name ?? GOLFERS[key]?.name ?? 'Unknown',
+          owners: (key && owners.get(key)) || [],
+        };
+      })()
+    : null;
+
   return {
     rows,
     roundsStarted,
@@ -654,5 +730,6 @@ export function computeStandings(board) {
     cut,
     golferBoard,
     scorecards,
+    playoffWinner,
   };
 }

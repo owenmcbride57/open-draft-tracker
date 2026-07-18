@@ -918,6 +918,172 @@ group('playoff contingency');
     assert.ok(card.teeTime == null, 'no playoff tee-time chip');
     assert.equal(card.currentRound, 4, 'the card shows round 4, not a playoff round');
   });
+
+  check('a playoff that is not yet complete awards no bonus', () => {
+    // The stub above is STATUS_IN_PROGRESS (completed: false). The winner is only
+    // settled once the championship is over, so nothing is credited mid-playoff.
+    assert.equal(pstd.playoffWinner, null, 'no winner while the playoff is live');
+    for (const r of pstd.rows) {
+      assert.equal(r.playoffBonus, 0, `${r.manager} should carry no bonus yet`);
+      assert.equal(r.adjustedTotal, r.total, `${r.manager} draft total is unadjusted`);
+    }
+  });
+}
+
+// ---------------------------------------------------------------------------
+
+group('playoff winner bonus');
+
+// The winner of a playoff earns their owners a one-stroke DRAFT-ORDER bonus. It
+// is deliberately kept off every stroke count: golfer totals stay pure 72-hole
+// figures, and only the entry's `adjustedTotal` — the number the draft is ranked
+// on — moves. These drive the fixtures directly through the model.
+{
+  const withPlayoff = (p, playoffScore) => ({ ...p, inPlayoff: true, playoffScore });
+
+  // Scheffler and McIlroy both finish 72 holes at -12. Scheffler wins the playoff
+  // (the lower aggregate over the extra holes); McIlroy is the runner-up.
+  const makeField = () => [
+    withPlayoff(player('Scottie Scheffler', [-3, -3, -3, -3], id('scheffler')), -1),
+    withPlayoff(player('Rory McIlroy', [-3, -3, -3, -3], id('mcilroy')), 0),
+    player('Collin Morikawa', [-2, -2, -2, -2], id('morikawa')),
+    player('Tommy Fleetwood', [-1, -1, -1, -1], id('fleetwood')),
+    player('Matt Fitzpatrick', [0, 0, 0, 0], id('fitzpatrick')),
+  ];
+
+  const done = computeStandings(board(makeField(), { complete: true }));
+
+  check('the winner is the playoff participant with the best aggregate', () => {
+    assert.ok(done.playoffWinner, 'a winner is resolved');
+    assert.equal(done.playoffWinner.id, id('scheffler'), 'Scheffler won the playoff');
+    assert.equal(done.playoffWinner.name, 'Scottie Scheffler');
+  });
+
+  check('the winner keeps a clean 72-hole score — no strokes added or removed', () => {
+    const gb = (gid) => done.golferBoard.find((g) => g.id === gid);
+    assert.equal(gb(id('scheffler')).total, -12, 'winner still -12');
+    assert.equal(gb(id('mcilroy')).total, -12, 'runner-up still -12, level with the winner');
+    assert.equal(gb(id('scheffler')).playoffWinner, true, 'winner flagged on the golfer board');
+    assert.equal(gb(id('mcilroy')).playoffWinner, false, 'runner-up is not flagged');
+  });
+
+  check('drafting the winner deducts one stroke from the draft-order total only', () => {
+    // Braddy: scheffler, fleetwood, fitzpatrick → -12 + -4 + 0 = -16 actual.
+    const braddy = done.rows.find((r) => r.manager === 'Braddy');
+    assert.equal(braddy.total, -16, 'actual combined score is unchanged');
+    assert.equal(braddy.playoffBonus, -1, 'one-stroke bonus for drafting the winner');
+    assert.equal(braddy.adjustedTotal, -17, 'draft-order total carries the bonus');
+    const s = braddy.golfers.find((g) => g.id === id('scheffler'));
+    assert.equal(s.playoffWinner, true, 'the winning pick is flagged inside the entry');
+    assert.equal(s.total, -12, "the winning pick's own score is untouched");
+  });
+
+  check('drafting only the runner-up earns no bonus', () => {
+    // Goon: mcilroy, rose, young — has the loser, not the winner.
+    const goon = done.rows.find((r) => r.manager === 'Goon');
+    assert.equal(goon.playoffBonus, 0, 'no bonus for the runner-up');
+    assert.equal(goon.adjustedTotal, goon.total, 'draft total equals actual score');
+    assert.ok(
+      !goon.golfers.some((g) => g.playoffWinner),
+      'no winning pick in this entry',
+    );
+  });
+
+  check('the bonus is at most one stroke even if the winner sits among other picks', () => {
+    // Every Scheffler owner gets exactly -1, never a multiple.
+    for (const r of done.rows) {
+      const hasWinner = r.golfers.some((g) => g.playoffWinner);
+      assert.equal(r.playoffBonus, hasWinner ? -1 : 0, `${r.manager} bonus`);
+    }
+  });
+
+  check('the bonus lifts a winner-owner clear of a same-scoring non-owner', () => {
+    // The whole point: a manager who drafted the winner ends up ahead of one who
+    // finished level on raw strokes but drafted the runner-up. (Ferrell and Goon
+    // both sit at -12 raw; Ferrell has Scheffler, Goon has McIlroy.)
+    let demonstrated = false;
+    for (const r of done.rows) {
+      if (!r.golfers.some((g) => g.playoffWinner)) continue;
+      for (const t of done.rows) {
+        if (t === r || t.total !== r.total) continue;
+        if (t.golfers.some((g) => g.playoffWinner)) continue; // both bonused → level is fine
+        assert.ok(r.adjustedTotal < t.adjustedTotal, `${r.manager} should sit clear of ${t.manager}`);
+        demonstrated = true;
+      }
+    }
+    assert.ok(demonstrated, 'at least one dead heat was broken by the bonus');
+  });
+
+  check('a tie in the playoff aggregate resolves no winner (safety net)', () => {
+    const field = makeField();
+    field[0] = withPlayoff(player('Scottie Scheffler', [-3, -3, -3, -3], id('scheffler')), 0);
+    field[1] = withPlayoff(player('Rory McIlroy', [-3, -3, -3, -3], id('mcilroy')), 0);
+    const std = computeStandings(board(field, { complete: true }));
+    assert.equal(std.playoffWinner, null, 'still level → no winner declared');
+    for (const r of std.rows) assert.equal(r.playoffBonus, 0, `${r.manager} unbonused`);
+  });
+
+  check('the lower aggregate wins, whichever golfer posts it', () => {
+    const field = makeField();
+    // Flip it: now McIlroy has the better aggregate.
+    field[0] = withPlayoff(player('Scottie Scheffler', [-3, -3, -3, -3], id('scheffler')), 1);
+    field[1] = withPlayoff(player('Rory McIlroy', [-3, -3, -3, -3], id('mcilroy')), -2);
+    const std = computeStandings(board(field, { complete: true }));
+    assert.equal(std.playoffWinner.id, id('mcilroy'), 'McIlroy took the playoff');
+  });
+}
+
+// The bonus survives the real ingestion path: playoff periods are captured as
+// participation without ever entering a golfer's score, and a completed event
+// credits the winner. Reuses the same stubbing shape as the contingency block.
+{
+  const fmtP = (v) => (v === 0 ? 'E' : v > 0 ? `+${v}` : `${v}`);
+  const holeCard = (n, s) =>
+    Array.from({ length: n }, (_, k) => ({ period: k + 1, value: 4, scoreType: { displayValue: k === 0 ? fmtP(s) : 'E' } }));
+  const roundLS = (period, s, holes) => ({ period, displayValue: fmtP(s), linescores: holeCard(holes, s) });
+  const makeComp = (gid, name, roundScores, totalDisplay, playoffScore = null) => {
+    const linescores = roundScores.map((s, i) => roundLS(i + 1, s, 18));
+    if (playoffScore != null) linescores.push(roundLS(5, playoffScore, 4));
+    return { id: gid, athlete: { id: gid, displayName: name }, score: totalDisplay, linescores };
+  };
+  const event = {
+    id: EVENT.id,
+    name: EVENT.name,
+    date: '2026-07-19T12:00Z',
+    status: { type: { name: 'STATUS_FINAL', completed: true, detail: 'Final' }, completed: true },
+    competitions: [{
+      competitors: [
+        makeComp(GOLFERS.scheffler.id, 'Scottie Scheffler', [-3, -3, -3, -3], '-12', -1), // wins
+        makeComp(GOLFERS.mcilroy.id, 'Rory McIlroy', [-3, -3, -3, -3], '-12', 0), // loses
+        makeComp(GOLFERS.morikawa.id, 'Collin Morikawa', [-2, -2, -2, -2], '-8'),
+      ],
+    }],
+  };
+
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async () => ({ ok: true, json: async () => ({ events: [event] }) });
+  let pboard;
+  try {
+    pboard = await fetchLeaderboard({ demo: false });
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+  const std = computeStandings(pboard);
+
+  check('playoff participation is parsed off the feed without touching the score', () => {
+    const w = pboard.field.find((p) => p.id === GOLFERS.scheffler.id);
+    assert.equal(w.inPlayoff, true, 'flagged as a playoff participant');
+    assert.equal(w.playoffScore, -1, 'the aggregate over the extra holes is captured');
+    assert.ok(w.rounds[5] === undefined, 'but no 5th round enters the model');
+    assert.equal(w.total, -12, 'and the 72-hole score is unchanged');
+  });
+
+  check('a completed feed credits the winner through the full path', () => {
+    assert.equal(std.playoffWinner.id, GOLFERS.scheffler.id, 'Scheffler credited');
+    const braddy = std.rows.find((r) => r.manager === 'Braddy');
+    assert.equal(braddy.playoffBonus, -1, 'his owner gets the draft bonus');
+    assert.equal(braddy.adjustedTotal, braddy.total - 1, 'adjusted one below actual');
+  });
 }
 
 // ---------------------------------------------------------------------------
