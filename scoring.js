@@ -453,13 +453,18 @@ export function computeStandings(board) {
       }
 
       // Sum the golfer's actual round scores, substituting the field's worst
-      // score for any round they did not play (i.e. they missed the cut or WD'd).
+      // score only for the rounds a MISSED-CUT golfer will never play. A golfer
+      // who made the cut is never penalised: a round they simply have not teed off
+      // yet (Sunday morning, say) is pending, not a zero they must answer for —
+      // charging it would brand a live survivor as a missed cut. Only once a golfer
+      // is confirmed out does an unplayed round become the field-worst penalty.
+      const cutGolfer = missedCut(player, cut);
       let total = 0;
       const penaltyRounds = [];
       for (let r = 1; r <= roundsStarted; r++) {
         if (player.rounds[r] != null) {
           total += player.rounds[r];
-        } else if (penalties[r]?.score != null) {
+        } else if (cutGolfer && penalties[r]?.score != null) {
           total += penalties[r].score;
           penaltyRounds.push({
             round: r,
@@ -496,7 +501,7 @@ export function computeStandings(board) {
         // status pill on every page — true as soon as the cut is decided, even in
         // the gap before round 3). `penalized` = a worst-in-field penalty has
         // actually been charged yet, which can only happen once round 3+ is played.
-        cut: missedCut(player, cut),
+        cut: cutGolfer,
         penalized: penaltyRounds.length > 0,
         // The golfer who won the playoff. Purely a flag for the bonus and its
         // badge — their `total` above is untouched, a clean 72-hole figure.

@@ -180,6 +180,32 @@ check('no penalty for rounds that have not started yet', () => {
   assert.ok(jack.golfers.every((g) => !g.cut), 'nobody is cut before R3 exists');
 });
 
+check('a survivor awaiting a later-round tee is not penalised for it', () => {
+  // The reported bug: on Sunday, once anyone tees off round 4 the round has
+  // "started", but a golfer who made the cut and simply has not gone out yet has
+  // no fourth-round score. That pending round must not be charged the field worst
+  // — doing so branded live survivors (Scheffler et al.) as missed cuts.
+  const field = [
+    player('Scottie Scheffler', [-2, -2, 0], id('scheffler')), // made cut, awaiting R4 tee
+    player('Rory McIlroy', [2, -3, -1, 0], id('mcilroy'), 2), // made cut, thru 2 of R4
+    player('Collin Morikawa', [-2, 0, 0], id('morikawa')), // made cut, awaiting R4 tee
+    player('Cut Guy', [5, 5], 'cutx'), // genuinely missed the cut
+  ];
+  for (let i = 0; i < 70; i++) field.push(player(`S${i}`, [-1, -1, 0, 0], `s${i}`));
+  field.push(player('Bad R4', [-1, -1, 0, 11], 'br4')); // field worst R4 = +11
+
+  const { rows } = computeStandings(board(field));
+  const jack = rows.find((r) => r.manager === 'Jack');
+  for (const g of jack.golfers) {
+    assert.equal(g.cut, false, `${g.name} made the cut and must not be flagged`);
+    assert.equal(g.penalized, false, `${g.name} must not be penalised for a round in progress`);
+    assert.equal(g.penaltyRounds.length, 0, `${g.name} has no penalty rounds`);
+  }
+  // Scheffler's total is his real -4, not -4 + an +11 phantom fourth round.
+  const s = jack.golfers.find((g) => g.id === id('scheffler'));
+  assert.equal(s.total, -4, 'the pending round adds nothing, not the field worst');
+});
+
 group('live worst-score-of-the-day');
 
 check('players still out on the course do not set the worst score', () => {
