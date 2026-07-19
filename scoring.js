@@ -212,19 +212,40 @@ function roundTwoComplete(field) {
 // to be played. Once every card is in and no third round has begun, that same
 // 36-hole line is the real cut: above it you survive, below it you are gone.
 //
-// Round 3+: still a fact, read a different way — a survivor has a third-round
-// score, and the line is the worst 36-hole total among them (which also absorbs
-// anyone who withdrew after the cut).
+// Round 3+: still a fact, read a different way — the line is the worst 36-hole
+// total among the golfers who actually teed off round 3 (which also absorbs
+// anyone who withdrew after the cut). ESPN hangs a placeholder third-round line
+// (a score, zero holes) on players before they start — and, we've seen, sometimes
+// on players who MISSED the cut — so a bare round-3 score is no proof of survival;
+// only a genuinely played hole (or a later round) is. Round-3 pairings go off
+// worst-score-first, so even early on the first golfers out pin the line honestly.
+function playedThirdRound(p) {
+  return (p.holes?.[3] ?? 0) > 0 || p.rounds[4] != null;
+}
+
 function computeCut(field, roundsStarted) {
   if (roundsStarted === 0) return { line: null, decided: false };
 
   if (roundsStarted >= 3) {
-    const survivors = field.filter((p) => p.rounds[3] != null);
-    if (survivors.length === 0) return { line: null, decided: true, byThirdRound: true };
-    const line = Math.max(
-      ...survivors.map((p) => (p.rounds[1] ?? 0) + (p.rounds[2] ?? 0)),
-    );
-    return { line, decided: true, byThirdRound: true };
+    const has36 = (p) => p.rounds[1] != null && p.rounds[2] != null;
+    const pool = field.filter((p) => has36(p) && playedThirdRound(p));
+    if (pool.length > 0) {
+      const line = Math.max(...pool.map((p) => p.rounds[1] + p.rounds[2]));
+      return { line, decided: true, byThirdRound: true };
+    }
+    // Round 3 exists only as placeholders — nobody has struck a shot yet. Fall
+    // back to the real 36-hole cut (top CUT_SIZE and ties) so the line stays
+    // honest in the gap before the first tee, rather than trusting placeholders.
+    const totals = field
+      .filter(has36)
+      .map((p) => p.rounds[1] + p.rounds[2])
+      .sort((a, b) => a - b);
+    if (totals.length === 0) return { line: null, decided: true, byThirdRound: true };
+    return {
+      line: totals[Math.min(CUT_SIZE - 1, totals.length - 1)],
+      decided: true,
+      byThirdRound: true,
+    };
   }
 
   const totals = field
@@ -278,16 +299,20 @@ function worstInRound(field, round) {
 // on the 36-hole total against the final line ("top 70 and ties" — level with the
 // line survives).
 //
-// A third-round score is positive proof a golfer made the cut, so once they have
-// one we're done. But its *absence* proves nothing: on Saturday morning round 3
-// has begun for the field the instant the first group tees off, yet most survivors
-// have not started their own third round and legitimately have no round-3 score
-// yet. Reading that gap as "missed the cut" would flag nearly the whole field as
-// CUT until each golfer teed off. So we fall through to the same 36-hole
-// comparison used in the gap between rounds 2 and 3.
+// Once round 3 is under way, survival is a 36-hole fact: missed the cut = a
+// 36-hole total worse than the line. It is judged on that total alone, never on
+// whether ESPN has hung a third-round line on the golfer. A bare round-3 score is
+// no proof of survival — ESPN attaches a placeholder round (a score, zero holes)
+// to players before they tee off, and sometimes to players who missed the cut —
+// and its absence is no proof of a miss either, since on Saturday morning most
+// survivors have simply not started their own third round yet. Reading the score
+// rather than its presence gets both cases right.
 function missedCut(player, cut) {
   if (!cut.decided || player.roundsPlayed === 0) return false;
-  if (cut.byThirdRound && player.rounds[3] != null) return false;
+  if (cut.byThirdRound) {
+    if (cut.line == null || player.rounds[1] == null || player.rounds[2] == null) return false;
+    return player.rounds[1] + player.rounds[2] > cut.line;
+  }
   const holeTotal = (player.rounds[1] ?? 0) + (player.rounds[2] ?? 0);
   return cut.line != null && holeTotal > cut.line;
 }
