@@ -91,10 +91,6 @@ export async function fetchLeaderboard({ demo = false, teeTimes = TEE_TIMES } = 
         continue;
       }
 
-      const par = toPar(ls.displayValue);
-      if (par == null) continue;
-      rounds[ls.period] = par;
-
       // ESPN nests the hole-by-hole card inside each round. Each hole carries
       // the strokes taken (value) and that hole's result to par (scoreType,
       // e.g. "-1" birdie, "E" par, "+1" bogey — verified: the per-hole results
@@ -107,6 +103,20 @@ export async function fetchLeaderboard({ demo = false, teeTimes = TEE_TIMES } = 
           result: h.scoreType?.displayValue ?? 'E',
         }))
         .sort((a, b) => a.hole - b.hole);
+
+      // A round with no holes recorded is a placeholder ESPN hangs on a round the
+      // golfer has not begun — not a round they played. Critically, for a golfer
+      // who missed the cut ESPN attaches such a placeholder to their next round
+      // with displayValue "-", which toPar reads as even par (0). Recording that
+      // as a real round makes a cut golfer look like they played on, which lands
+      // them in the survivor pool and silently poisons the cut line so that *no
+      // one* is ever flagged as cut. Skip any round nobody has holed out in — the
+      // score, if any, is not one they've actually posted.
+      if (perHole.length === 0) continue;
+
+      const par = toPar(ls.displayValue);
+      if (par == null) continue;
+      rounds[ls.period] = par;
 
       holes[ls.period] = perHole.length;
       cards[ls.period] = perHole;

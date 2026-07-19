@@ -1134,6 +1134,80 @@ group('playoff winner bonus');
 
 // ---------------------------------------------------------------------------
 
+group('live-feed cut placeholders');
+
+// The live ESPN feed does NOT trim a cut golfer to two rounds. Mid-tournament it
+// hangs a placeholder on the round they will not play — displayValue "-", zero
+// holes — and toPar reads "-" as even par. Recording that as a real round put
+// every cut golfer into the survivor pool, poisoned the cut line, and left no one
+// flagged as cut. This drives the real ingestion path with that exact shape.
+{
+  const fmtP = (v) => (v === 0 ? 'E' : v > 0 ? `+${v}` : `${v}`);
+  const holeCard = (n) => Array.from({ length: n }, (_, k) => ({ period: k + 1, value: 4, scoreType: { displayValue: 'E' } }));
+  // rounds: array of { s?: scoreToPar, holes } — a 0-hole entry with no score is
+  // ESPN's "-" placeholder for a round not begun.
+  const comp = (gid, name, rounds) => ({
+    id: gid,
+    athlete: { id: gid, displayName: name },
+    score: fmtP(rounds.filter((r) => r.holes > 0).reduce((a, r) => a + r.s, 0)),
+    linescores: rounds.map((r, i) => ({
+      period: i + 1,
+      displayValue: r.holes > 0 ? fmtP(r.s) : '-',
+      linescores: holeCard(r.holes),
+    })),
+  });
+
+  const finishedR3 = (s1, s2, s3) => [{ s: s1, holes: 18 }, { s: s2, holes: 18 }, { s: s3, holes: 18 }, { holes: 0 }];
+  const cutGolfer = (s1, s2) => [{ s: s1, holes: 18 }, { s: s2, holes: 18 }, { holes: 0 }]; // R3 "-" placeholder
+  const notTeedR3 = (s1, s2) => [{ s: s1, holes: 18 }, { s: s2, holes: 18 }, { holes: 0 }]; // identical shape to a cut golfer
+
+  const field = [
+    comp(GOLFERS.scheffler.id, 'Scottie Scheffler', cutGolfer(4, 5)), // +9 → missed the cut
+    comp(GOLFERS.mcilroy.id, 'Rory McIlroy', finishedR3(-3, -3, -1)), // survivor, third round in
+    comp(GOLFERS.morikawa.id, 'Collin Morikawa', notTeedR3(-2, -2)), // -4 survivor, not yet out for R3
+  ];
+  for (let i = 0; i < 68; i++) field.push(comp(`g${i}`, `Good ${i}`, finishedR3(-1, -1, 0))); // -2, safe
+  for (let i = 0; i < 80; i++) field.push(comp(`c${i}`, `Cut ${i}`, cutGolfer(4, 5))); // +9, out
+
+  const event = {
+    id: EVENT.id,
+    name: EVENT.name,
+    date: '2026-07-18T06:00Z',
+    status: { type: { name: 'STATUS_IN_PROGRESS', completed: false }, completed: false },
+    competitions: [{ competitors: field }],
+  };
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async () => ({ ok: true, json: async () => ({ events: [event] }) });
+  let board;
+  try {
+    board = await fetchLeaderboard({});
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+  const std = computeStandings(board);
+  const g = (id) => std.golferBoard.find((x) => x.id === id);
+
+  check('a "-" placeholder round is not ingested as a played round', () => {
+    const s = board.field.find((p) => p.id === GOLFERS.scheffler.id);
+    assert.ok(s.rounds[3] === undefined, 'the cut golfer has no third round');
+    assert.equal(s.roundsPlayed, 2, 'only the two rounds actually played');
+  });
+
+  check('the cut line is not poisoned by cut golfers who "played" a phantom round', () => {
+    assert.equal(std.cut.decided, true, 'the cut is settled by the third round');
+    assert.equal(std.cut.line, -2, 'the line is the real 36-hole line, not the field worst');
+  });
+
+  check('a cut golfer is flagged, and both kinds of survivor are not', () => {
+    assert.equal(g(GOLFERS.scheffler.id).madeCut, false, 'the +9 golfer is cut');
+    assert.equal(g(GOLFERS.scheffler.id).position, 'CUT', 'and shown as CUT');
+    assert.equal(g(GOLFERS.mcilroy.id).madeCut, true, 'the survivor already into round 3 is safe');
+    assert.equal(g(GOLFERS.morikawa.id).madeCut, true, 'the survivor not yet out for round 3 is also safe');
+  });
+}
+
+// ---------------------------------------------------------------------------
+
 group('real ESPN data — 2026 Genesis Scottish Open (completed, real cut)');
 
 const toPar = (d) => (d === 'E' ? 0 : Number(String(d).replace('+', '')));
