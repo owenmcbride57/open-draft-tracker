@@ -187,8 +187,13 @@ fixed number:
 - **Rounds 1–2** it's a *projection*. We sort the field on their running totals
   and read off the 70th score; anyone level with it is inside too. This number
   moves all through Friday.
-- **Round 3 onward** it's a *fact*. Anyone with a third-round score survived, and
-  the line is the worst 36-hole total among them.
+- **Round 3 onward** it's a *fact*. The line is the worst 36-hole total among the
+  golfers who have actually **teed off** round 3, and survival is decided by that
+  36-hole line — not by whether ESPN has attached a third-round score. ESPN hangs
+  a placeholder third round (a score, zero holes) on players before they start,
+  and sometimes on players who *missed* the cut, so a bare round-3 line proves
+  nothing; only a genuinely played hole does. (Round-3 pairings go off
+  worst-score-first, so the early groups pin the line correctly.)
 
 This view shows each golfer's **real** score, not their penalised fantasy score —
 it's about the golfer, not the maths. The penalty only appears on the draft board.

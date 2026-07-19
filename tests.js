@@ -574,6 +574,33 @@ check('a survivor who has not yet teed off round 3 is not flagged as cut', () =>
   assert.equal(flag(GOLFERS.scheffler.id), false, 'only the golfer above the line is cut');
 });
 
+check('a placeholder round-3 line does not resurrect a cut golfer', () => {
+  // The reported bug: ESPN sometimes hangs an empty third round (a score, zero
+  // holes) on a player who actually missed the cut. Left unchecked they read as
+  // "made the cut" and show as playing at "E today", slotted in among the
+  // survivors — and they pollute the cut line too. The cut is a 36-hole fact, so
+  // an empty round-3 line must not override it.
+  const cutGolfer = player('Rory McIlroy', [5, 5], GOLFERS.mcilroy.id); // +10, well outside
+  cutGolfer.rounds[3] = 0; // a round-3 score…
+  cutGolfer.holes[3] = 0; // …but not a single hole struck
+  cutGolfer.cards[3] = [];
+  cutGolfer.roundsPlayed = 3;
+
+  const field = [
+    cutGolfer,
+    player('Scottie Scheffler', [-2, -2, -2], GOLFERS.scheffler.id), // survived, out in R3
+    player('Grinder', [2, 2, 1], 'x1'), // survived at +4 through 36
+  ];
+  const { cut, golferBoard, scorecards } = computeStandings(board(field));
+
+  assert.equal(cut.line, 4, 'the line reads the real R3 field, not the placeholder');
+  const rory = golferBoard.find((g) => g.id === GOLFERS.mcilroy.id);
+  assert.equal(rory.madeCut, false, 'still cut despite the empty third round');
+  assert.equal(rory.position, 'CUT', 'not slotted in among the survivors');
+  const card = scorecards.find((g) => g.id === GOLFERS.mcilroy.id);
+  assert.equal(card.state, 'cut', 'the scorecard shows CUT, not a live "E today"');
+});
+
 check('the golfer board carries live round progress for the status indicator', () => {
   const field = [player('Scottie Scheffler', [-3, -3, -2], GOLFERS.scheffler.id, 9)];
   const g = computeStandings(board(field)).golferBoard.find((x) => x.id === GOLFERS.scheffler.id);
