@@ -2,14 +2,14 @@
   "event": "401811957",
   "decided": true,
   "cut": {
-    "aberg": false,
-    "dechambeau": false,
-    "fleetwood": false,
     "young": false,
-    "rahm": false,
     "scheffler": false,
+    "fleetwood": false,
+    "dechambeau": false,
+    "aberg": false,
     "morikawa": false,
     "mcilroy": false,
+    "rahm": false,
     "rose": true,
     "fitzpatrick": true,
     "hovland": true
