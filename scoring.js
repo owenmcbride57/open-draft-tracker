@@ -274,14 +274,22 @@ function worstInRound(field, round) {
   };
 }
 
-// Did this player miss the cut? Only once the cut is decided. After round 3 has
-// begun a survivor simply has a third-round score. In the gap between round 2
-// finishing and round 3 starting we compare their 36-hole total to the final line
-// ("top 70 and ties" — level with the line survives).
+// Did this player miss the cut? Only once the cut is decided, and always judged
+// on the 36-hole total against the final line ("top 70 and ties" — level with the
+// line survives).
+//
+// A third-round score is positive proof a golfer made the cut, so once they have
+// one we're done. But its *absence* proves nothing: on Saturday morning round 3
+// has begun for the field the instant the first group tees off, yet most survivors
+// have not started their own third round and legitimately have no round-3 score
+// yet. Reading that gap as "missed the cut" would flag nearly the whole field as
+// CUT until each golfer teed off. So we fall through to the same 36-hole
+// comparison used in the gap between rounds 2 and 3.
 function missedCut(player, cut) {
   if (!cut.decided || player.roundsPlayed === 0) return false;
-  if (cut.byThirdRound) return player.rounds[3] == null;
-  return cut.line != null && player.total != null && player.total > cut.line;
+  if (cut.byThirdRound && player.rounds[3] != null) return false;
+  const holeTotal = (player.rounds[1] ?? 0) + (player.rounds[2] ?? 0);
+  return cut.line != null && holeTotal > cut.line;
 }
 
 // The tee time for a golfer's *upcoming* round — but only while they genuinely

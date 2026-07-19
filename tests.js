@@ -528,6 +528,29 @@ check('a lone "thru 0" withdrawal does not hold the cut open', () => {
   assert.equal(golferBoard.find((g) => g.id === GOLFERS.scheffler.id).madeCut, true, 'the survivor is not');
 });
 
+check('a survivor who has not yet teed off round 3 is not flagged as cut', () => {
+  // Saturday morning: round 2 is complete and the leaders' round-3 groups have
+  // begun, so a third-round score exists in the field — but most survivors have
+  // not started their own round yet. Their missing round-3 score must not be read
+  // as a missed cut; only the 36-hole line decides who is out.
+  const field = [
+    player('Scottie Scheffler', [4, 5], GOLFERS.scheffler.id), // +9, genuinely cut
+    player('Rory McIlroy', [-3, -3], GOLFERS.mcilroy.id), // -6, safe, not yet out
+    player('Collin Morikawa', [-2, -2], GOLFERS.morikawa.id), // -4, safe, not yet out
+  ];
+  for (let i = 0; i < 68; i++) field.push(player(`Good ${i}`, [-1, -1], `g${i}`)); // -2, safe
+  field.push(player('Early Starter', [-1, -1, 1], 'early', 6)); // -2, six holes into round 3
+
+  const { cut, golferBoard } = computeStandings(board(field));
+  assert.equal(cut.decided, true, 'the cut is final once round 2 is in');
+  assert.ok(cut.byThirdRound, 'a round-3 score exists, so it reads by the third round');
+
+  const flag = (id) => golferBoard.find((g) => g.id === id).madeCut;
+  assert.equal(flag(GOLFERS.mcilroy.id), true, 'the survivor still awaiting his tee time is safe');
+  assert.equal(flag(GOLFERS.morikawa.id), true, 'as is the other one');
+  assert.equal(flag(GOLFERS.scheffler.id), false, 'only the golfer above the line is cut');
+});
+
 check('the golfer board carries live round progress for the status indicator', () => {
   const field = [player('Scottie Scheffler', [-3, -3, -2], GOLFERS.scheffler.id, 9)];
   const g = computeStandings(board(field)).golferBoard.find((x) => x.id === GOLFERS.scheffler.id);
