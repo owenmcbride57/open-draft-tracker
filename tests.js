@@ -627,6 +627,57 @@ check('a placeholder round-3 line does not resurrect a cut golfer', () => {
   assert.equal(card.state, 'cut', 'the scorecard shows CUT, not a live "E today"');
 });
 
+group('authoritative cut status');
+
+check("ESPN's own cut status overrides the inference, both ways", () => {
+  // The hard case inference can't settle: on Saturday morning a survivor who has
+  // not teed off round 3 looks identical to a golfer who missed the cut — both
+  // sit on 36 holes with no third round. ESPN's core API knows which is which
+  // (STATUS_CUT), and cut-status.json carries it. When present it is the last word.
+  const field = [
+    // 36-hole totals that the inferred line would get WRONG at the margin.
+    player('Collin Morikawa', [3, 0], GOLFERS.morikawa.id), // +3, but ESPN says still in
+    player('Scottie Scheffler', [1, 1], GOLFERS.scheffler.id), // +2, but ESPN says cut
+    player('Grinder', [1, 1, 0], 'x1'), // a survivor genuinely out in round 3
+  ];
+  for (let i = 0; i < 69; i++) field.push(player(`S${i}`, [0, 0, 0], `s${i}`));
+
+  const cutStatus = { morikawa: false, scheffler: true };
+  const { golferBoard, scorecards } = computeStandings(board(field), { cutStatus });
+  const g = (id) => golferBoard.find((x) => x.id === id);
+
+  assert.equal(g(GOLFERS.morikawa.id).madeCut, true, 'ESPN says Morikawa is in — trust it');
+  assert.ok(g(GOLFERS.morikawa.id).position !== 'CUT', 'so he is ranked, not shown CUT');
+  assert.equal(g(GOLFERS.scheffler.id).madeCut, false, 'ESPN says Scheffler is out — trust it');
+  assert.equal(g(GOLFERS.scheffler.id).position, 'CUT', 'shown CUT despite a survivable score');
+  assert.equal(scorecards.find((x) => x.id === GOLFERS.scheffler.id).state, 'cut', 'card agrees');
+});
+
+check('a golfer ESPN marks cut is penalised; one it marks in is not', () => {
+  const field = [
+    player('Scottie Scheffler', [-2, -2, 0], GOLFERS.scheffler.id), // in, awaiting R4 tee
+    player('Rory McIlroy', [4, 4], GOLFERS.mcilroy.id), // ESPN: cut
+    player('Collin Morikawa', [0, 0, 0], GOLFERS.morikawa.id), // in
+  ];
+  for (let i = 0; i < 70; i++) field.push(player(`S${i}`, [-1, -1, 0, 0], `s${i}`));
+  field.push(player('Bad R4', [-1, -1, 0, 11], 'br4')); // field worst R4 = +11
+  field.push(player('Bad R3', [-1, -1, 9, 0], 'br3')); // field worst R3 = +9
+
+  const cutStatus = { scheffler: false, mcilroy: true, morikawa: false };
+  const { rows } = computeStandings(board(field), { cutStatus });
+  const jack = rows.find((r) => r.manager === 'Jack');
+  const g = (id) => jack.golfers.find((x) => x.id === id);
+
+  assert.equal(g(GOLFERS.scheffler.id).penalized, false, 'the in golfer takes no penalty for R4');
+  assert.equal(g(GOLFERS.morikawa.id).penalized, false, 'nor this one');
+  assert.equal(g(GOLFERS.mcilroy.id).cut, true, 'the cut golfer is flagged');
+  assert.deepEqual(
+    g(GOLFERS.mcilroy.id).penaltyRounds.map((p) => p.round),
+    [3, 4],
+    'and charged the field worst for the two rounds he missed',
+  );
+});
+
 check('the golfer board carries live round progress for the status indicator', () => {
   const field = [player('Scottie Scheffler', [-3, -3, -2], GOLFERS.scheffler.id, 9)];
   const g = computeStandings(board(field)).golferBoard.find((x) => x.id === GOLFERS.scheffler.id);

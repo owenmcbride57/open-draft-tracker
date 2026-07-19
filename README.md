@@ -195,6 +195,13 @@ fixed number:
   nothing; only a genuinely played hole does. (Round-3 pairings go off
   worst-score-first, so the early groups pin the line correctly.)
 
+Because inferring the cut from a public feed that never cleanly says "cut" kept
+producing edge cases, a scheduled Action (`cut-status.yml`) pulls each drafted
+golfer's **authoritative** status — ESPN's own `STATUS_CUT` — from the core API
+and commits it to `cut-status.json`, exactly as tee times are sourced. When that
+file is present the board trusts it outright; the inference above is only the
+fallback for the gap before it first lands.
+
 This view shows each golfer's **real** score, not their penalised fantasy score —
 it's about the golfer, not the maths. The penalty only appears on the draft board.
 

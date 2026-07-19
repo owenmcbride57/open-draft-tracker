@@ -318,6 +318,11 @@ function worstInRound(field, round) {
 // survivors have simply not started their own third round yet. Reading the score
 // rather than its presence gets both cases right.
 function missedCut(player, cut) {
+  // ESPN's own per-player cut status (STATUS_CUT), when we have it, is the last
+  // word — a published fact, not something to infer. It's stamped onto the player
+  // in computeStandings from cut-status.json (see scripts/fetch-cut.mjs). Only the
+  // rare gap before that file first lands falls back to the inference below.
+  if (player.authCut != null) return player.authCut;
   if (!cut.decided || player.roundsPlayed === 0) return false;
   if (cut.byThirdRound) {
     if (cut.line == null || player.rounds[1] == null || player.rounds[2] == null) return false;
@@ -403,9 +408,22 @@ function resolvePlayoffWinner(field) {
   return winners.length === 1 ? winners[0].id : null;
 }
 
-export function computeStandings(board) {
+export function computeStandings(board, { cutStatus } = {}) {
   const { field, started, complete } = board;
   const byId = new Map(field.map((p) => [p.id, p]));
+
+  // Stamp ESPN's authoritative per-player cut status onto the field when we have
+  // it (cut-status.json, refreshed by a scheduled Action from the core API — the
+  // same server-side pattern as tee times, since the browser can't reach that
+  // API). It's keyed by our golfer key; only our drafted golfers carry a flag,
+  // and missedCut treats it as the final word, inferring the cut only for players
+  // (and moments) it doesn't cover.
+  if (cutStatus) {
+    for (const p of field) {
+      const key = ID_TO_KEY.get(p.id);
+      if (key && key in cutStatus) p.authCut = cutStatus[key];
+    }
+  }
 
   // The playoff winner earns a one-stroke draft-order bonus for whoever drafted
   // them — settled only once the championship is over, so a bonus never flickers

@@ -3,7 +3,7 @@
 // sets ?v=N on this script; we pass it straight down the import graph.
 const V = new URL(import.meta.url).search;
 
-const { REFRESH_SECONDS } = await import(`./config.js${V}`);
+const { REFRESH_SECONDS, EVENT } = await import(`./config.js${V}`);
 const { fetchLeaderboard, computeStandings, formatToPar } = await import(`./scoring.js${V}`);
 
 const boardEl = document.getElementById('board');
@@ -660,6 +660,23 @@ async function loadTeeTimes() {
   }
 }
 
+// Authoritative per-golfer cut status, refreshed by a scheduled GitHub Action
+// (cut-status.json — ESPN's core API carries the real STATUS_CUT the public feed
+// doesn't, so the site can stop inferring who's cut from placeholder rounds). We
+// only trust it once the cut is actually decided and it's for this event; any
+// miss falls back to computeStandings' own inference, so the board never breaks.
+async function loadCutStatus() {
+  try {
+    const res = await fetch(`./cut-status.json?t=${Date.now()}`, { cache: 'no-store' });
+    if (!res.ok) return undefined;
+    const data = await res.json();
+    if (!data?.decided || String(data.event) !== String(EVENT.id)) return undefined;
+    return data.cut ?? undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 async function tick() {
   if (inFlight) return;
   inFlight = true;
@@ -667,10 +684,10 @@ async function tick() {
   paintFreshness();
 
   try {
-    const teeTimes = await loadTeeTimes();
+    const [teeTimes, cutStatus] = await Promise.all([loadTeeTimes(), loadCutStatus()]);
     const board = await fetchLeaderboard({ demo: DEMO, teeTimes });
     inFlight = false;
-    render(board, computeStandings(board));
+    render(board, computeStandings(board, { cutStatus }));
     errorEl.hidden = true;
     if (DEMO) document.body.classList.add('demo');
   } catch (err) {
