@@ -3,9 +3,15 @@
 import { EVENT, GOLFERS, ENTRIES } from './config.js';
 import { fetchLeaderboard, computeStandings, formatToPar } from './scoring.js';
 
-const out = document.getElementById('out');
+// This file runs in two places: in the browser via tests.html (results render
+// into the page) and under Node via `npm test` (results print to the console and
+// the process exits non-zero on any failure). Everything below is written to work
+// in either, keying off whether a DOM is present.
+const isBrowser = typeof document !== 'undefined';
+const out = isBrowser ? document.getElementById('out') : null;
 let passed = 0;
 let failed = 0;
+let skipped = 0;
 
 const assert = {
   ok(cond, msg = 'expected truthy') {
@@ -24,10 +30,14 @@ const assert = {
 };
 
 function log(text, cls = '') {
-  const el = document.createElement('div');
-  el.className = cls;
-  el.textContent = text;
-  out.appendChild(el);
+  if (isBrowser) {
+    const el = document.createElement('div');
+    el.className = cls;
+    el.textContent = text;
+    out.appendChild(el);
+  } else {
+    console.log(text);
+  }
 }
 
 function group(name) {
@@ -43,6 +53,19 @@ function check(name, fn) {
     log(`  ✗ ${name}\n      ${err.message}`, 'fail');
     failed++;
   }
+}
+
+// A check that depends on live ESPN data. When the feed can't be reached — a CI
+// box with no route to ESPN, an offline run — it is skipped rather than failed,
+// so the offline unit suite stays a reliable gate.
+let liveDataAvailable = true;
+function liveCheck(name, fn) {
+  if (!liveDataAvailable) {
+    log(`  ~ ${name} (skipped: live feed unavailable)`, 'skip');
+    skipped++;
+    return;
+  }
+  check(name, fn);
 }
 
 const id = (key) => GOLFERS[key].id;
@@ -1143,11 +1166,11 @@ try {
     };
   });
 } catch (err) {
-  log(`  ✗ could not fetch real data: ${err.message}`, 'fail');
-  failed++;
+  log(`  ~ live ESPN feed unavailable (${err.message}) — skipping real-data checks`, 'skip');
+  liveDataAvailable = false;
 }
 
-check('feed parses: both 4-round and 2-round players present', () => {
+liveCheck('feed parses: both 4-round and 2-round players present', () => {
   const made = realField.filter((p) => p.roundsPlayed === 4).length;
   const missed = realField.filter((p) => p.roundsPlayed === 2).length;
   assert.ok(made > 50 && missed > 50, `made=${made} missed=${missed}`);
@@ -1155,7 +1178,7 @@ check('feed parses: both 4-round and 2-round players present', () => {
   log(`      ${made} made the cut, ${missed} missed`, 'note');
 });
 
-check('ESPN really does give 18 holes per completed round (the fix depends on it)', () => {
+liveCheck('ESPN really does give 18 holes per completed round (the fix depends on it)', () => {
   // If ESPN ever stopped nesting the hole-by-hole card, every round would look
   // "in progress" and no penalty would ever be charged. Assert the shape.
   let checked = 0;
@@ -1169,7 +1192,7 @@ check('ESPN really does give 18 holes per completed round (the fix depends on it
   log(`      ${checked} completed rounds, all carrying a full 18-hole card`, 'note');
 });
 
-check('per-hole results sum to the round score, for every card in the field', () => {
+liveCheck('per-hole results sum to the round score, for every card in the field', () => {
   // This is the assumption the scorecard grid rests on: scoreType is the score
   // for THAT hole (birdie/par/bogey), not a running total. If ESPN ever changed
   // it to cumulative, the colours would be nonsense — so assert it on real data.
@@ -1186,7 +1209,7 @@ check('per-hole results sum to the round score, for every card in the field', ()
   log(`      ${cards} full cards, every one summing hole-by-hole to its round score`, 'note');
 });
 
-check('a real card yields a sensible par for every hole', () => {
+liveCheck('a real card yields a sensible par for every hole', () => {
   // The grid derives par as strokes - holeResult. Par must land in 3..5.
   const p = realField.find((x) => x.roundsPlayed === 4);
   const card = p.cards[1];
@@ -1198,14 +1221,14 @@ check('a real card yields a sensible par for every hole', () => {
   log(`      ${p.name}'s round 1 implies a par-${total} course`, 'note');
 });
 
-check('our per-round parsing sums to ESPN’s own total for every finisher', () => {
+liveCheck('our per-round parsing sums to ESPN’s own total for every finisher', () => {
   for (const p of realField.filter((x) => x.roundsPlayed === 4)) {
     const sum = Object.values(p.rounds).reduce((a, b) => a + b, 0);
     assert.equal(sum, p.total, `${p.name}: rounds sum to ${sum}, ESPN says ${p.total}`);
   }
 });
 
-check('a penalised cut golfer ends up worse than the last-place finisher', () => {
+liveCheck('a penalised cut golfer ends up worse than the last-place finisher', () => {
   const { penalties } = computeStandings(board(realField));
   const r3 = penalties[3].score;
   const r4 = penalties[4].score;
@@ -1231,6 +1254,15 @@ check('a penalised cut golfer ends up worse than the last-place finisher', () =>
   );
 });
 
-const summary = document.getElementById('summary');
-summary.textContent = failed === 0 ? `ALL ${passed} CHECKS PASSED` : `${failed} FAILED, ${passed} passed`;
-summary.className = failed === 0 ? 'ok' : 'bad';
+const skipNote = skipped > 0 ? ` (${skipped} skipped)` : '';
+const summaryText = failed === 0 ? `ALL ${passed} CHECKS PASSED${skipNote}` : `${failed} FAILED, ${passed} passed${skipNote}`;
+
+if (isBrowser) {
+  const summary = document.getElementById('summary');
+  summary.textContent = summaryText;
+  summary.className = failed === 0 ? 'ok' : 'bad';
+} else {
+  console.log(`\n${summaryText}`);
+  // Fail the `npm test` run if any check failed.
+  if (failed > 0) process.exitCode = 1;
+}
